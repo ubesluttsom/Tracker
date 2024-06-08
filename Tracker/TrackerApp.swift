@@ -1,17 +1,16 @@
-//
-//  TrackerApp.swift
-//  Tracker
-//
-//  Created by Martin Mihle Nygaard on 31/05/2024.
-//
-
 import SwiftUI
 
 @main
 struct TrackerApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(ContentViewModel.shared)
+                .onAppear {
+                    ContentViewModel.shared.loadTimerState()
+                }
         }
     }
 }
