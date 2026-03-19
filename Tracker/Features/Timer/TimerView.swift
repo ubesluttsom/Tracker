@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct TimerView: View {
-    @ObservedObject var viewModel: ContentViewModel
+    var viewModel: ContentViewModel
     
     var body: some View {
         HStack {

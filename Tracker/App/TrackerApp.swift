@@ -7,7 +7,6 @@ struct TrackerApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(ContentViewModel.shared)
                 .onAppear {
                     ContentViewModel.shared.loadTimerState()
                 }

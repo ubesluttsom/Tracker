@@ -3,7 +3,7 @@ import EventKit
 import EventKitUI
 
 struct ShowAllView: View {
-    @ObservedObject var viewModel: ContentViewModel
+    @Bindable var viewModel: ContentViewModel
 
     @State private var selectedEvent: EKEvent?
     @State private var showEventDetail = false

@@ -2,7 +2,7 @@ import SwiftUI
 import EventKitUI
 
 struct ContentView: View {
-    @ObservedObject private var viewModel = ContentViewModel.shared
+    @Bindable private var viewModel = ContentViewModel.shared
 
     var body: some View {
         NavigationView {
@@ -39,4 +39,8 @@ struct ContentView: View {
             }
         }
     }
+}
+
+#Preview {
+    ContentView()
 }

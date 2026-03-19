@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct EventFormView: View {
-    @ObservedObject var viewModel: ContentViewModel
+    @Bindable var viewModel: ContentViewModel
     
     var body: some View {
         List {
@@ -53,7 +53,7 @@ struct EventFormView: View {
 }
 
 struct TimeAdjustmentButtons: View {
-    @ObservedObject var viewModel: ContentViewModel
+    var viewModel: ContentViewModel
     
     var body: some View {
         HStack {

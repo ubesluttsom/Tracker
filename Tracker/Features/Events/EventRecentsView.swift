@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct EventRecentsView: View {
-    @ObservedObject var viewModel: ContentViewModel
+    var viewModel: ContentViewModel
     
     var body: some View {
         // Text("Recents")

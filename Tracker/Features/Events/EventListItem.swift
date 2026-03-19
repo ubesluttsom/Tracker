@@ -2,7 +2,7 @@ import SwiftUI
 import EventKit
 
 struct EventListItem: View {
-    @ObservedObject var viewModel: ContentViewModel
+    var viewModel: ContentViewModel
     var event: EKEvent
 
     var body: some View {

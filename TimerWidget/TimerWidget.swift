@@ -8,6 +8,8 @@
 import WidgetKit
 import SwiftUI
 
+// TimelineProvider tells WidgetKit when and how to refresh the home-screen widget.
+// It generates a batch of timeline entries; WidgetKit renders each one at its date.
 struct Provider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
         SimpleEntry(date: Date(), elapsedTime: 0, isRunning: false, configuration: ConfigurationAppIntent())
@@ -16,11 +18,12 @@ struct Provider: AppIntentTimelineProvider {
     func snapshot(for configuration: ConfigurationAppIntent, in context: Context) async -> SimpleEntry {
         SimpleEntry(date: Date(), elapsedTime: 3600, isRunning: true, configuration: configuration)
     }
-    
+
     func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<SimpleEntry> {
         var entries: [SimpleEntry] = []
 
-        // Generate a timeline consisting of five entries an hour apart, starting from the current date.
+        // Five entries at 10-minute intervals give ~50 minutes of widget updates
+        // before WidgetKit requests a new timeline (policy: .atEnd).
         let currentDate = Date()
         for minuteOffset in 0 ..< 5 {
             let entryDate = Calendar.current.date(byAdding: .minute, value: minuteOffset * 10, to: currentDate)!

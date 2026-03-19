@@ -1,9 +1,15 @@
 import EventKit
 
+// All calendar operations go through a dedicated "Tracker" calendar rather than
+// the user's default calendar. This keeps tracked time entries separate and easy
+// to show/hide in Calendar.app. EKEventStore is shared as a static instance
+// because creating multiple stores can cause merge conflicts in EventKit.
 class CalendarHelper {
     static let eventStore = EKEventStore()
 
     static func logTimeToCalendar(startTime: Date?, duration: TimeInterval, eventName: String, eventNotes: String) {
+        // requestFullAccessToEvents is idempotent — if already granted it
+        // returns immediately, so it's safe to call on every write.
         eventStore.requestFullAccessToEvents { granted, error in
             if granted && error == nil {
                 let calendars = eventStore.calendars(for: .event)

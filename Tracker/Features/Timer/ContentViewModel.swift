@@ -2,19 +2,23 @@ import SwiftUI
 import EventKit
 import ActivityKit
 
-class ContentViewModel: ObservableObject {
+// Uses iOS 17's @Observable macro instead of ObservableObject + @Published.
+// SwiftUI automatically tracks property access in view bodies — no wrappers needed.
+@Observable class ContentViewModel {
+    // Singleton so all views share one timer/event state and the AppDelegate
+    // can update the Live Activity from a background task.
     static let shared = ContentViewModel()
-    
-    @Published var startTime: Date?
-    @Published var timerString: String = "--:--:--"
-    @Published var timerRunning = false
-    @Published var eventName: String = ""
-    @Published var eventNotes: String = ""
-    @Published var showTextField: Bool = true
-    @Published var showAll = false
-    @Published var events: [EKEvent] = []
-    @Published var selectedEvent: EKEvent?
-    @Published var showEventDetail = false
+
+    var startTime: Date?
+    var timerString: String = "--:--:--"
+    var timerRunning = false
+    var eventName: String = ""
+    var eventNotes: String = ""
+    var showTextField: Bool = true
+    var showAll = false
+    var events: [EKEvent] = []
+    var selectedEvent: EKEvent?
+    var showEventDetail = false
 
     private var timer: Timer?
     private var liveActivity: Activity<TimerWidgetAttributes>?
@@ -131,7 +135,7 @@ class ContentViewModel: ObservableObject {
             let initialState = TimerWidgetAttributes.ContentState(
                 eventName: eventName,
                 eventNotes: eventNotes,
-                elapsedTime: 0,
+                startDate: startTime ?? Date(),
                 isRunning: true
             )
             do {
@@ -144,11 +148,10 @@ class ContentViewModel: ObservableObject {
 
     private func updateLiveActivity() {
         guard let activity = liveActivity else { return }
-        let elapsedTime = Date().timeIntervalSince(startTime ?? Date())
         let updatedState = TimerWidgetAttributes.ContentState(
             eventName: eventName,
             eventNotes: eventNotes,
-            elapsedTime: elapsedTime,
+            startDate: startTime ?? Date(),
             isRunning: timerRunning
         )
         Task {
@@ -158,11 +161,10 @@ class ContentViewModel: ObservableObject {
 
     private func endLiveActivity() {
         guard let activity = liveActivity else { return }
-        let elapsedTime = Date().timeIntervalSince(startTime ?? Date())
         let finalState = TimerWidgetAttributes.ContentState(
             eventName: eventName,
             eventNotes: eventNotes,
-            elapsedTime: elapsedTime,
+            startDate: startTime ?? Date(),
             isRunning: false
         )
         Task {
@@ -175,12 +177,14 @@ class ContentViewModel: ObservableObject {
         updateLiveActivity()
     }
     
+    // Persist timer state to UserDefaults so a running timer survives app
+    // termination (e.g. system kill while backgrounded). loadTimerState()
+    // restores it on next launch.
     private func saveTimerState() {
         UserDefaults.standard.set(startTime, forKey: "startTime")
         UserDefaults.standard.set(timerRunning, forKey: "timerRunning")
         UserDefaults.standard.set(eventName, forKey: "eventName")
         UserDefaults.standard.set(eventNotes, forKey: "eventNotes")
-
     }
 
     func loadTimerState() {

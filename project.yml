@@ -1,0 +1,61 @@
+# XcodeGen project specification.
+# Run `xcodegen generate` to regenerate Tracker.xcodeproj from this file.
+# Docs: https://github.com/yonaskolb/XcodeGen/blob/master/Docs/ProjectSpec.md
+
+name: Tracker
+
+options:
+  # Minimum iOS version — must match across all targets.
+  deploymentTarget:
+    iOS: "17.5"
+
+settings:
+  base:
+    # Apple Developer Team ID, shared by all targets.
+    DEVELOPMENT_TEAM: 522K42S895
+
+targets:
+  # ── Main App ──────────────────────────────────────────────────────────
+  Tracker:
+    type: application
+    platform: iOS
+    sources: Tracker
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: no.mihle.Tracker
+        INFOPLIST_FILE: Tracker/Info.plist
+        GENERATE_INFOPLIST_FILE: YES
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        # Calendar permission prompt shown to the user.
+        INFOPLIST_KEY_NSCalendarsUsageDescription: "Tracker needs calendar access to log your timer sessions."
+        INFOPLIST_KEY_NSSupportsLiveActivities: YES
+        # Path to SwiftUI preview assets.
+        DEVELOPMENT_ASSET_PATHS: "\"Tracker/Resources/Preview Content\""
+    dependencies:
+      # Embed the widget extension inside the app bundle.
+      - target: TimerWidgetExtension
+        embed: true
+
+  # ── Widget Extension ──────────────────────────────────────────────────
+  # Provides the Lock Screen / Dynamic Island Live Activity and a
+  # home-screen widget showing elapsed time.
+  TimerWidgetExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: TimerWidget
+      # TimerWidgetAttributes is shared with the main app; include it here
+      # so the extension can decode the ActivityKit state.
+      - path: Tracker/Core/Models/TimerWidgetAttributes.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: no.mihle.Tracker.TimerWidget
+        INFOPLIST_FILE: TimerWidget/Info.plist
+        # Let Xcode generate standard plist keys (CFBundleIdentifier, etc.)
+        # and merge them with our Info.plist. Required for AppIntents processing.
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: TimerWidget
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SKIP_INSTALL: YES
