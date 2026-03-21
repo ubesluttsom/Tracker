@@ -1,5 +1,4 @@
 import SwiftUI
-import EventKit
 import ActivityKit
 
 // Uses iOS 17's @Observable macro instead of ObservableObject + @Published.
@@ -9,16 +8,18 @@ import ActivityKit
     // can update the Live Activity from a background task.
     static let shared = ContentViewModel()
 
+    var sessionStore: SessionStore?
+
     var startTime: Date?
     var timerString: String = "--:--:--"
     var timerRunning = false
-    var eventName: String = ""
-    var eventNotes: String = ""
+    var sessionName: String = ""
+    var sessionNotes: String = ""
+    var sessionTags: [String] = []
     var showTextField: Bool = true
     var showAll = false
-    var events: [EKEvent] = []
-    var selectedEvent: EKEvent?
-    var showEventDetail = false
+    var sessions: [Session] = []
+    var selectedSession: Session?
 
     private var timer: Timer?
     private var liveActivity: Activity<TimerWidgetAttributes>?
@@ -44,8 +45,15 @@ import ActivityKit
         saveTimerState()
         AppDelegate.cancelAppRefresh() // Cancel the background task
         if let start = startTime {
-            let elapsed = Date().timeIntervalSince(start)
-            CalendarHelper.logTimeToCalendar(startTime: start, duration: elapsed, eventName: eventName, eventNotes: eventNotes)
+            let session = Session(
+                title: sessionName.isEmpty ? "Tracked Time" : sessionName,
+                startDate: start,
+                endDate: Date(),
+                notes: sessionNotes,
+                tags: sessionTags
+            )
+            sessionStore?.save(session)
+            fetchSessions()
         }
         endLiveActivity()
         startTime = nil
@@ -94,47 +102,28 @@ import ActivityKit
         }
     }
 
-    func fetchEvents() {
-        CalendarHelper.fetchEvents { fetchedEvents in
-            DispatchQueue.main.async {
-                self.events = Array(fetchedEvents)
-            }
-        }
+    func fetchSessions() {
+        sessions = sessionStore?.fetchAll() ?? []
     }
 
-    func deleteEvent(at offsets: IndexSet) {
-        offsets.forEach { index in
-            let event = events[index]
-            CalendarHelper.deleteEvent(event: event) { success in
-                if success {
-                    DispatchQueue.main.async {
-                        self.events.remove(at: index)
-                        self.fetchEvents()
-                    }
-                }
-            }
+    func deleteSession(at offsets: IndexSet) {
+        for index in offsets {
+            sessionStore?.delete(sessions[index])
         }
+        fetchSessions()
     }
 
-    func deleteEventFromDetail(event: EKEvent) {
-        if let index = events.firstIndex(where: { $0.eventIdentifier == event.eventIdentifier }) {
-            CalendarHelper.deleteEvent(event: event) { success in
-                if success {
-                    DispatchQueue.main.async {
-                        self.events.remove(at: index)
-                        self.fetchEvents()
-                    }
-                }
-            }
-        }
+    func deleteSession(_ session: Session) {
+        sessionStore?.delete(session)
+        fetchSessions()
     }
 
     private func startLiveActivity() {
         if ActivityAuthorizationInfo().areActivitiesEnabled {
             let attributes = TimerWidgetAttributes()
             let initialState = TimerWidgetAttributes.ContentState(
-                eventName: eventName,
-                eventNotes: eventNotes,
+                eventName: sessionName,
+                eventNotes: sessionNotes,
                 startDate: startTime ?? Date(),
                 isRunning: true
             )
@@ -149,8 +138,8 @@ import ActivityKit
     private func updateLiveActivity() {
         guard let activity = liveActivity else { return }
         let updatedState = TimerWidgetAttributes.ContentState(
-            eventName: eventName,
-            eventNotes: eventNotes,
+            eventName: sessionName,
+            eventNotes: sessionNotes,
             startDate: startTime ?? Date(),
             isRunning: timerRunning
         )
@@ -162,8 +151,8 @@ import ActivityKit
     private func endLiveActivity() {
         guard let activity = liveActivity else { return }
         let finalState = TimerWidgetAttributes.ContentState(
-            eventName: eventName,
-            eventNotes: eventNotes,
+            eventName: sessionName,
+            eventNotes: sessionNotes,
             startDate: startTime ?? Date(),
             isRunning: false
         )
@@ -183,16 +172,16 @@ import ActivityKit
     private func saveTimerState() {
         UserDefaults.standard.set(startTime, forKey: "startTime")
         UserDefaults.standard.set(timerRunning, forKey: "timerRunning")
-        UserDefaults.standard.set(eventName, forKey: "eventName")
-        UserDefaults.standard.set(eventNotes, forKey: "eventNotes")
+        UserDefaults.standard.set(sessionName, forKey: "sessionName")
+        UserDefaults.standard.set(sessionNotes, forKey: "sessionNotes")
     }
 
     func loadTimerState() {
         if UserDefaults.standard.bool(forKey: "timerRunning") {
             startTime = UserDefaults.standard.object(forKey: "startTime") as? Date
             timerRunning = true
-            eventName = UserDefaults.standard.string(forKey: "eventName") ?? ""
-            eventNotes = UserDefaults.standard.string(forKey: "eventNotes") ?? ""
+            sessionName = UserDefaults.standard.string(forKey: "sessionName") ?? ""
+            sessionNotes = UserDefaults.standard.string(forKey: "sessionNotes") ?? ""
             // Restart the timer
             startLiveActivity()
             timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
@@ -202,8 +191,8 @@ import ActivityKit
         } else {
             timerRunning = false
             startTime = nil
-            eventName = ""
-            eventNotes = ""
+            sessionName = ""
+            sessionNotes = ""
         }
     }
 }

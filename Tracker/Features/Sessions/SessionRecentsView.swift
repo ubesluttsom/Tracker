@@ -1,25 +1,17 @@
 import SwiftUI
 
-struct EventRecentsView: View {
+struct SessionRecentsView: View {
     var viewModel: ContentViewModel
-    
+
     var body: some View {
-        // Text("Recents")
-        //     .font(.headline)
-        //     .frame(maxWidth: .infinity, alignment: .leading)
-        //     .listRowBackground(Color.clear)
-        //     .listRowInsets(EdgeInsets())
-        //     .padding()
-        
-        ForEach(viewModel.events.prefix(5), id: \.eventIdentifier) { event in
-            EventListItem(viewModel: viewModel, event: event)
+        ForEach(viewModel.sessions.prefix(5)) { session in
+            SessionListItem(viewModel: viewModel, session: session)
                 .onTapGesture {
-                    viewModel.selectedEvent = event
-                    viewModel.showEventDetail.toggle()
+                    viewModel.selectedSession = session
                 }
         }
-        .onDelete(perform: viewModel.deleteEvent)
-        
+        .onDelete(perform: viewModel.deleteSession)
+
         HStack {
             Spacer()
             Button(action: {
@@ -36,7 +28,7 @@ struct EventRecentsView: View {
             Spacer()
             Text("·").foregroundStyle(.gray.secondary)
             Spacer()
-            Button(action: viewModel.fetchEvents) {
+            Button(action: viewModel.fetchSessions) {
                 Text("Refresh")
             }
             Spacer()

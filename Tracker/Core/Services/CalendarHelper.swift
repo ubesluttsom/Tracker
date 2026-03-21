@@ -98,4 +98,11 @@ class CalendarHelper {
             completion(false)
         }
     }
+
+    /// Delete a calendar event by its identifier. Used by SessionStore
+    /// to keep the calendar in sync when a Session is deleted.
+    static func deleteEventByID(_ identifier: String) {
+        guard let event = eventStore.event(withIdentifier: identifier) else { return }
+        try? eventStore.remove(event, span: .thisEvent)
+    }
 }

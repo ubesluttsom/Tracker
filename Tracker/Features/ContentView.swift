@@ -1,4 +1,3 @@
-import EventKitUI
 import SwiftUI
 
 struct ContentView: View {
@@ -17,28 +16,21 @@ struct ContentView: View {
 
         VStack {
           if !viewModel.showTextField {
-            Text(viewModel.eventName)
+            Text(viewModel.sessionName)
               .font(.headline)
               .foregroundColor(.secondary)
           }
           TimerView(viewModel: viewModel).background(.clear)
           if viewModel.showTextField {
-            EventFormView(viewModel: viewModel)
+            TimerFormView(viewModel: viewModel)
           }
         }
         .sheet(isPresented: $viewModel.showAll) {
           ShowAllView(viewModel: viewModel)
         }
-        .onAppear(perform: viewModel.fetchEvents)
-        .onChange(
-          of: viewModel.events,
-          { _, _ in
-            viewModel.fetchEvents()
-          }
-        )
-        .sheet(item: $viewModel.selectedEvent) { event in
-          EventDetailView(
-            event: event, events: $viewModel.events, onDelete: viewModel.deleteEventFromDetail)
+        .onAppear(perform: viewModel.fetchSessions)
+        .sheet(item: $viewModel.selectedSession) { session in
+          SessionDetailView(session: session, onDelete: viewModel.deleteSession)
         }
       }
     }

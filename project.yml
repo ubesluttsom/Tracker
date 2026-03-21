@@ -28,6 +28,11 @@ targets:
     type: application
     platform: iOS
     sources: Tracker
+    entitlements:
+      path: Tracker/Tracker.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.no.mihle.Tracker
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: no.mihle.Tracker
@@ -52,6 +57,11 @@ targets:
   TimerWidgetExtension:
     type: app-extension
     platform: iOS
+    entitlements:
+      path: TimerWidget/TimerWidgetExtension.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.no.mihle.Tracker
     sources:
       - path: TimerWidget
       # TimerWidgetAttributes is shared with the main app; include it here

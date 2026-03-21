@@ -21,13 +21,14 @@ struct TimerView: View {
                         viewModel.toggleTimer()
                         viewModel.startTime = nil
                         viewModel.updateTimerString()
-                        viewModel.fetchEvents()
+                        viewModel.fetchSessions()
                     }) {
                         Image(systemName: "stop.circle.fill")
                             .font(.largeTitle)
                             .padding([.top, .bottom, .trailing])
                             .foregroundColor(.red)
                     }
+                    .sensoryFeedback(.start, trigger: viewModel.timerRunning)
                 } else {
                     Button(action: {
                         if viewModel.startTime == nil {
@@ -40,6 +41,7 @@ struct TimerView: View {
                             .padding([.top, .bottom, .trailing])
                             .foregroundColor(.green)
                     }
+                    .sensoryFeedback(.stop, trigger: viewModel.timerRunning)
                 }
             }
         }
