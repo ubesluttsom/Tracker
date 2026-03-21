@@ -7,12 +7,20 @@ name: Tracker
 options:
   # Minimum iOS version — must match across all targets.
   deploymentTarget:
-    iOS: "17.5"
+    iOS: "18.0"
 
 settings:
   base:
     # Apple Developer Team ID, shared by all targets.
     DEVELOPMENT_TEAM: 522K42S895
+
+schemes:
+  Tracker:
+    build:
+      targets:
+        Tracker: all
+    run:
+      config: Debug
 
 targets:
   # ── Main App ──────────────────────────────────────────────────────────
