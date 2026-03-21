@@ -30,6 +30,7 @@ targets:
         # Calendar permission prompt shown to the user.
         INFOPLIST_KEY_NSCalendarsUsageDescription: "Tracker needs calendar access to log your timer sessions."
         INFOPLIST_KEY_NSSupportsLiveActivities: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
         # Path to SwiftUI preview assets.
         DEVELOPMENT_ASSET_PATHS: "\"Tracker/Resources/Preview Content\""
     dependencies:
