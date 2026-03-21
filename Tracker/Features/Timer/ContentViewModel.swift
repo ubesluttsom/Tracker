@@ -42,7 +42,7 @@ import ActivityKit
         timer?.invalidate()
         timerRunning = false
         saveTimerState()
-        AppDelegate().cancelAppRefresh() // Cancel the background task
+        AppDelegate.cancelAppRefresh() // Cancel the background task
         if let start = startTime {
             let elapsed = Date().timeIntervalSince(start)
             CalendarHelper.logTimeToCalendar(startTime: start, duration: elapsed, eventName: eventName, eventNotes: eventNotes)

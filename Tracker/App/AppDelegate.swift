@@ -45,7 +45,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         operationQueue.addOperation(operation)
     }
 
-    func cancelAppRefresh() {
+    static func cancelAppRefresh() {
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: "no.mihle.Tracker.refresh")
     }
 }

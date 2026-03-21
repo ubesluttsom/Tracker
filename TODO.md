@@ -4,7 +4,9 @@
 
 - [ ] The main view is cut off somewhat. Like a letterbox?
 
-- [ ] `AppDelegate().cancelAppRefresh()` in `stopTimer()` instantiates a new AppDelegate instead of using the real one. Make `cancelAppRefresh()` static.
+- [x] `AppDelegate().cancelAppRefresh()` in `stopTimer()` instantiates a new
+      AppDelegate instead of using the real one. Make `cancelAppRefresh()`
+      static.
 
 - [ ] `onChange(of: viewModel.events) { fetchEvents() }` in ContentView is an infinite-loop risk — fires on every fetch result.
 
