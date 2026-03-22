@@ -18,6 +18,7 @@ import ActivityKit
     var sessionTags: [String] = []
     var showTextField: Bool = true
     var showAll = false
+    var showStatistics = false
     var sessions: [Session] = []
     var selectedSession: Session?
 

@@ -92,8 +92,13 @@
 
 ---
 
-- [ ] As a user, I want to be able to see statistics of sessions. For tagged
-      sessions, I want aggregated views for day, week, and month.
+- [x] As a user, I want to be able to see statistics of sessions. For tagged
+      sessions, I want aggregated views for day, week, and month. It should
+      be possible to add the aggregate you want based on tags. For example,
+      it should be possible to see statistics for a "Billable" tag.
+
+  Details: the view should have a true black background. It should not be a
+  gray pop over card. A simple table is fine to start with.
 
 ---
 
@@ -116,7 +121,7 @@
 
 ---
 
-- [ ] As a user, I want to edit a session's title, notes, tags, and start/end
+- [x] As a user, I want to edit a session's title, notes, tags, and start/end
       time after it's been logged. Currently SessionDetailView is read-only with
       a delete button — it should support inline editing. Edits should also sync
       to the calendar via `calendarEventID`.

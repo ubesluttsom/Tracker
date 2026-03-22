@@ -32,6 +32,12 @@ struct SessionRecentsView: View {
                 Text("Refresh")
             }
             Spacer()
+            Text("·").foregroundStyle(.gray.secondary)
+            Spacer()
+            Button(action: { viewModel.showStatistics = true }) {
+                Text("Statistics")
+            }
+            Spacer()
         }
         .buttonStyle(BorderlessButtonStyle())
         .foregroundStyle(.blue.secondary)

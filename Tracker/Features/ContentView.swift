@@ -32,6 +32,9 @@ struct ContentView: View {
         .sheet(item: $viewModel.selectedSession) { session in
           SessionDetailView(session: session, onDelete: viewModel.deleteSession, onUpdate: viewModel.updateSession)
         }
+        .fullScreenCover(isPresented: $viewModel.showStatistics) {
+          StatisticsView(sessions: viewModel.sessions)
+        }
       }
     }
   }
