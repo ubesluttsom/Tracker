@@ -118,6 +118,11 @@ import ActivityKit
         fetchSessions()
     }
 
+    func updateSession(_ session: Session) {
+        sessionStore?.update(session)
+        fetchSessions()
+    }
+
     private func startLiveActivity() {
         if ActivityAuthorizationInfo().areActivitiesEnabled {
             let attributes = TimerWidgetAttributes()

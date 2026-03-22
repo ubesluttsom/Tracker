@@ -99,6 +99,16 @@ class CalendarHelper {
         }
     }
 
+    /// Update an existing calendar event to reflect edited session data.
+    static func updateEventByID(_ identifier: String, title: String, startDate: Date, endDate: Date, notes: String) {
+        guard let event = eventStore.event(withIdentifier: identifier) else { return }
+        event.title = title.isEmpty ? "Tracked Time" : title
+        event.startDate = startDate
+        event.endDate = endDate
+        event.notes = notes
+        try? eventStore.save(event, span: .thisEvent)
+    }
+
     /// Delete a calendar event by its identifier. Used by SessionStore
     /// to keep the calendar in sync when a Session is deleted.
     static func deleteEventByID(_ identifier: String) {

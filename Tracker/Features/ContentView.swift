@@ -30,7 +30,7 @@ struct ContentView: View {
         }
         .onAppear(perform: viewModel.fetchSessions)
         .sheet(item: $viewModel.selectedSession) { session in
-          SessionDetailView(session: session, onDelete: viewModel.deleteSession)
+          SessionDetailView(session: session, onDelete: viewModel.deleteSession, onUpdate: viewModel.updateSession)
         }
       }
     }

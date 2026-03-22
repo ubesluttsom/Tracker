@@ -25,6 +25,21 @@ class SessionStore {
         )
     }
 
+    func update(_ session: Session) {
+        try? modelContext.save()
+
+        // Write-through: update the calendar event if one exists
+        if let eventID = session.calendarEventID {
+            CalendarHelper.updateEventByID(
+                eventID,
+                title: session.title,
+                startDate: session.startDate,
+                endDate: session.endDate,
+                notes: session.notes
+            )
+        }
+    }
+
     func fetchAll() -> [Session] {
         let descriptor = FetchDescriptor<Session>(
             sortBy: [SortDescriptor(\.startDate, order: .reverse)]
