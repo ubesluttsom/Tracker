@@ -14,12 +14,7 @@ struct ContentView: View {
             }
           }
 
-        VStack {
-          if !viewModel.showTextField {
-            Text(viewModel.sessionName)
-              .font(.headline)
-              .foregroundColor(.secondary)
-          }
+          VStack(spacing: 4) {
           TimerView(viewModel: viewModel).background(.clear)
           if viewModel.showTextField {
             TimerFormView(viewModel: viewModel)

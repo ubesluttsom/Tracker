@@ -21,6 +21,8 @@ import ActivityKit
     var showStatistics = false
     var sessions: [Session] = []
     var selectedSession: Session?
+    var showDailyTotal: Bool = false
+    var dailyTotalFilterTags: [String] = []
 
     private var timer: Timer?
     private var liveActivity: Activity<TimerWidgetAttributes>?
@@ -106,6 +108,55 @@ import ActivityKit
     func fetchSessions() {
         sessions = sessionStore?.fetchAll() ?? []
     }
+
+    // MARK: - Daily Total
+
+    var todaySessions: [Session] {
+        sessions.filter { Calendar.current.isDateInToday($0.startDate) }
+    }
+
+    var todayAvailableTags: [String] {
+        let savedTags = Set(todaySessions.flatMap(\.tags))
+        let currentTags = Set(sessionTags)
+        return savedTags.union(currentTags).sorted()
+    }
+
+    var dailyTotalString: String {
+        var filtered = todaySessions
+        if !dailyTotalFilterTags.isEmpty {
+            filtered = filtered.filter { session in
+                session.tags.contains(where: dailyTotalFilterTags.contains)
+            }
+        }
+        var total = filtered.reduce(0.0) { $0 + $1.duration }
+
+        // Add current running session if it matches the filter
+        if timerRunning, let start = startTime {
+            let currentMatches = dailyTotalFilterTags.isEmpty ||
+                sessionTags.contains(where: dailyTotalFilterTags.contains)
+            if currentMatches {
+                total += Date().timeIntervalSince(start)
+            }
+        }
+
+        let hours = Int(total) / 3600
+        let minutes = (Int(total) % 3600) / 60
+        return "\(hours)h \(minutes)m"
+    }
+
+    func toggleDailyTotalTag(_ tag: String) {
+        if let index = dailyTotalFilterTags.firstIndex(of: tag) {
+            dailyTotalFilterTags.remove(at: index)
+        } else {
+            dailyTotalFilterTags.append(tag)
+        }
+    }
+
+    func initDailyTotalTags() {
+        dailyTotalFilterTags = sessionTags
+    }
+
+    // MARK: - Delete & Update
 
     func deleteSession(at offsets: IndexSet) {
         for index in offsets {
