@@ -124,6 +124,35 @@ import ActivityKit
         fetchSessions()
     }
 
+    // MARK: - Merge & Copy
+
+    func canMergeSessions(_ a: Session, _ b: Session) -> Bool {
+        a.title == b.title && a.notes == b.notes && a.tags == b.tags
+    }
+
+    /// Returns the time gap between two sessions (negative if they overlap).
+    func timeGap(between a: Session, _ b: Session) -> TimeInterval {
+        let earlier = a.startDate < b.startDate ? a : b
+        let later = a.startDate < b.startDate ? b : a
+        return later.startDate.timeIntervalSince(earlier.endDate)
+    }
+
+    /// Merge two sessions: expand the kept session's time range to cover both, delete the other.
+    func mergeSessions(keep: Session, remove: Session) {
+        keep.startDate = min(keep.startDate, remove.startDate)
+        keep.endDate = max(keep.endDate, remove.endDate)
+        updateSession(keep)
+        deleteSession(remove)
+    }
+
+    /// Copy title, notes, and tags from one session to another.
+    func copySessionData(from source: Session, to target: Session) {
+        target.title = source.title
+        target.notes = source.notes
+        target.tags = source.tags
+        updateSession(target)
+    }
+
     private func startLiveActivity() {
         if ActivityAuthorizationInfo().areActivitiesEnabled {
             let attributes = TimerWidgetAttributes()
