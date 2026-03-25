@@ -23,6 +23,7 @@ import ActivityKit
     var selectedSession: Session?
     var showDailyTotal: Bool = false
     var dailyTotalFilterTags: [String] = []
+    private var currentDate: Date = Date()
 
     private var timer: Timer?
     private var liveActivity: Activity<TimerWidgetAttributes>?
@@ -91,11 +92,12 @@ import ActivityKit
     }
 
     func updateTimerString() {
+        currentDate = Date()
         guard let start = startTime else {
             timerString = "--:--:--"
             return
         }
-        let elapsed = Date().timeIntervalSince(start)
+        let elapsed = currentDate.timeIntervalSince(start)
         timerString = formatTime(elapsed)
     }
 
@@ -135,7 +137,7 @@ import ActivityKit
             let currentMatches = dailyTotalFilterTags.isEmpty ||
                 sessionTags.contains(where: dailyTotalFilterTags.contains)
             if currentMatches {
-                total += Date().timeIntervalSince(start)
+                total += currentDate.timeIntervalSince(start)
             }
         }
 

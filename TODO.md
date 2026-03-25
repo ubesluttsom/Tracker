@@ -9,6 +9,15 @@
       AppDelegate instead of using the real one. Make `cancelAppRefresh()`
       static.
 
+- [x] The "at a glance" daily total display doesn't live-update while a timer
+      is running — it only refreshes when tapped. **Root cause**: `@Observable`
+      only re-renders views when tracked properties change; `dailyTotalString`
+      called `Date()` directly (untracked), and when `showDailyTotal` is true
+      `timerString` isn't accessed so its updates don't trigger re-renders.
+      **Fix**: Added a `currentDate: Date` property updated each tick in
+      `updateTimerString()`; `dailyTotalString` now reads `currentDate` instead
+      of `Date()`, creating the missing dependency.
+
 - [x] `onChange(of: viewModel.events) { fetchEvents() }` in ContentView is an
       infinite-loop risk — fires on every fetch result. **Fixed**: Removed
       during SwiftData migration; `fetchSessions()` is called explicitly.
