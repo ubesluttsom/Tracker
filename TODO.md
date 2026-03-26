@@ -152,3 +152,26 @@
 
 - [x] As a user, I want a tactile feel to buttons. For example the time
       adjustment buttons.
+
+---
+
+- [ ] As a user, I want to set a session's start time by scrubbing a scrollable
+      timeline rather than tapping +/− buttons. The timeline should have tick
+      marks every 5 minutes, haptic feedback on each tick, already-logged
+      sessions rendered as blocks so I can see context at a glance, and a mild
+      snap to the end of the immediately preceding session.
+
+### Tasks
+
+- [ ] Build `TimelinePickerView` as a self-contained SwiftUI module (no changes
+      to existing start-time UI yet) — horizontal scroll view with minute
+      resolution, tick marks at 5-minute intervals, current-time indicator
+- [ ] Render existing sessions as shaded blocks on the timeline so the user can
+      see gaps and overlaps while scrubbing
+- [ ] Add `UIImpactFeedbackGenerator` (or `UISelectionFeedbackGenerator`) haptic
+      pulse on each 5-minute tick crossing
+- [ ] Implement snap-to-tail: when the scrubbed value comes within ~1–2 minutes
+      of the end of the nearest preceding session, snap and emit a distinct
+      haptic
+- [ ] Wire `TimelinePickerView` into a preview/test screen so it can be evaluated
+      standalone before replacing the existing start-time control
