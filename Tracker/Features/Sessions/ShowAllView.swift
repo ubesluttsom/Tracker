@@ -38,7 +38,7 @@ struct ShowAllView: View {
             }
             .onAppear(perform: viewModel.fetchSessions)
             .sheet(item: $selectedSession) { session in
-                SessionDetailView(session: session, onDelete: viewModel.deleteSession, onUpdate: viewModel.updateSession)
+                SessionDetailView(session: session, sessions: viewModel.todaySessions, onDelete: viewModel.deleteSession, onUpdate: viewModel.updateSession)
             }
             .alert("Large Time Gap", isPresented: $showMergeWarning) {
                 Button("Merge Anyway", role: .destructive) {

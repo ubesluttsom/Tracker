@@ -25,7 +25,7 @@ struct ContentView: View {
         }
         .onAppear(perform: viewModel.fetchSessions)
         .sheet(item: $viewModel.selectedSession) { session in
-          SessionDetailView(session: session, onDelete: viewModel.deleteSession, onUpdate: viewModel.updateSession)
+          SessionDetailView(session: session, sessions: viewModel.todaySessions, onDelete: viewModel.deleteSession, onUpdate: viewModel.updateSession)
         }
         .fullScreenCover(isPresented: $viewModel.showStatistics) {
           StatisticsView(sessions: viewModel.sessions)

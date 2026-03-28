@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SessionDetailView: View {
   var session: Session
+  var sessions: [Session] = []
   var onDelete: (Session) -> Void
   var onUpdate: ((Session) -> Void)?
   @Environment(\.dismiss) private var dismiss
@@ -13,6 +14,7 @@ struct SessionDetailView: View {
   @State private var editTags: [String] = []
   @State private var editStartDate: Date = Date()
   @State private var editEndDate: Date = Date()
+  @State private var timelineInteracting = false
 
   var body: some View {
     NavigationView {
@@ -36,6 +38,13 @@ struct SessionDetailView: View {
         Section(header: Text("Time")) {
           if isEditing {
             DatePicker("Start", selection: $editStartDate)
+            TimelinePickerView(
+              selectedTime: $editStartDate,
+              sessions: sessions,
+              activeTags: editTags,
+              isInteracting: $timelineInteracting
+            )
+            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
             DatePicker("End", selection: $editEndDate, in: editStartDate..., displayedComponents: [.date, .hourAndMinute])
           } else {
             LabeledContent(
@@ -59,6 +68,7 @@ struct SessionDetailView: View {
           }
         }
       }
+      .scrollDisabled(timelineInteracting)
       .navigationTitle(isEditing ? "Edit Session" : session.title)
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {

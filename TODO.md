@@ -34,6 +34,25 @@
 - [ ] Consolidate the three copies of `formatTime` (ContentViewModel,
       TimerWidgetLiveActivity, TimerWidget) into a shared utility.
 
+- [x] Break up `TimelinePickerView` — the body is ~170 lines in a single
+      `GeometryReader` → `ZStack`. **Done**: Extracted `TimelineContext`
+      struct and 8 private sub-view methods. Body is now a readable outline.
+
+- [x] Replace `Timer.scheduledTimer` momentum in `TimelinePickerView` with a
+      SwiftUI-native approach. **Done**: Replaced with `Task { @MainActor }`
+      + `Task.sleep(for: .milliseconds(16))`. No more `DispatchQueue.main.async`.
+
+- [x] Remove `ContentViewModel.shared` references from timeline views.
+      **Done**: Replaced `SessionListItem` with an inline row in the
+      bar-sessions sheet. `SessionDetailView` now receives `sessions`
+      as a parameter instead of accessing the singleton. No singleton
+      references remain in timeline or session detail views.
+
+- [x] Consider unifying the three animatable position modifiers
+      (`SlidingPosition`, `DateLabelSlide`, `BarPosition`). **Done**: Merged
+      `DateLabelSlide` into `SlidingPosition`. `BarPosition` kept separate
+      (serves a different purpose — animating row changes, not sliding).
+
 - [x] Add `@retroactive` to `EKEvent: Identifiable` conformance to silence the
       compiler warning and future-proof against EventKit changes. **Fixed**:
       `EKEvent+Extensions.swift` deleted; views no longer use `EKEvent`.
@@ -143,6 +162,23 @@
 
 ---
 
+- [ ] As a user, I want the timeline to be the primary way I browse and edit
+      sessions. Scrolling should browse by default (no state changes). Tapping
+      a session bar selects it and shows its details inline. Tapping Start/End
+      in the details form enters scrub-editing mode where scrolling adjusts
+      that timestamp. Auto-save with undo toast.
+
+### Tasks
+
+- [x] Phase 1+2: Browse mode, viewport decoupling, session selection, inline
+      details form
+- [x] Phase 3: Scrub-editing (Start/End fields activate scrub mode, visual
+      indicator, constrain start < end, zoom-to-fit, undo toast)
+- [x] Phase 4: Active session polish (pulse animation on active bars,
+      scrub-editing start only, zoom-to-fit on active bar tap)
+
+---
+
 - [ ] As a user, I want more control over _tags_. Maybe I want to create
       _tag sets_ that together share some common settings. Maybe I want some
       tags to have different colors. I _do_ want to be able to aggregate
@@ -160,7 +196,9 @@
       marks every 5 minutes, haptic feedback on each tick, already-logged
       sessions rendered as blocks so I can see context at a glance, and a mild
       snap to the end of the immediately preceding session. The implementation
-      should be "modular", so that it can be reus
+      should be "modular", so that it can be reused (for example in the "edit"
+      view). Also, I don't want to remove the old module just yet, I want to
+      test out the new one first.
 
 ### Tasks
 
