@@ -159,7 +159,8 @@
       timeline rather than tapping +/− buttons. The timeline should have tick
       marks every 5 minutes, haptic feedback on each tick, already-logged
       sessions rendered as blocks so I can see context at a glance, and a mild
-      snap to the end of the immediately preceding session.
+      snap to the end of the immediately preceding session. The implementation
+      should be "modular", so that it can be reus
 
 ### Tasks
 
@@ -173,5 +174,11 @@
 - [ ] Implement snap-to-tail: when the scrubbed value comes within ~1–2 minutes
       of the end of the nearest preceding session, snap and emit a distinct
       haptic
-- [ ] Wire `TimelinePickerView` into a preview/test screen so it can be evaluated
-      standalone before replacing the existing start-time control
+- [ ] Wire `TimelinePickerView` into a preview/test screen so it can be
+      evaluated standalone before replacing the existing start-time control
+
+---
+
+- [ ] As a user, I want to more easily add manual session entries. Currently
+      it's only possible to add sessions by spamming start and stop, then edit
+      later.
