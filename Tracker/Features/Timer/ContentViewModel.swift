@@ -262,6 +262,7 @@ import ActivityKit
         UserDefaults.standard.set(timerRunning, forKey: "timerRunning")
         UserDefaults.standard.set(sessionName, forKey: "sessionName")
         UserDefaults.standard.set(sessionNotes, forKey: "sessionNotes")
+        UserDefaults.standard.set(sessionTags, forKey: "sessionTags")
     }
 
     func loadTimerState() {
@@ -270,6 +271,7 @@ import ActivityKit
             timerRunning = true
             sessionName = UserDefaults.standard.string(forKey: "sessionName") ?? ""
             sessionNotes = UserDefaults.standard.string(forKey: "sessionNotes") ?? ""
+            sessionTags = UserDefaults.standard.array(forKey: "sessionTags") as? [String] ?? []
             // Restart the timer
             startLiveActivity()
             timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
@@ -281,6 +283,7 @@ import ActivityKit
             startTime = nil
             sessionName = ""
             sessionNotes = ""
+            sessionTags = []
         }
     }
 }

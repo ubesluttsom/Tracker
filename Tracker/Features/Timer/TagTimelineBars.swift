@@ -97,8 +97,20 @@ struct TagTimelineBarsView: View {
                     : TagColor.color(for: bar.tag)
                 let stickyPadding = max(4, -rawX + 4)
 
-                RoundedRectangle(cornerRadius: expandedCornerRadius)
-                    .fill(color)
+                Group {
+                    if bar.isActive {
+                        UnevenRoundedRectangle(
+                            topLeadingRadius: expandedCornerRadius,
+                            bottomLeadingRadius: expandedCornerRadius,
+                            bottomTrailingRadius: 0,
+                            topTrailingRadius: 0
+                        )
+                        .fill(color)
+                    } else {
+                        RoundedRectangle(cornerRadius: expandedCornerRadius)
+                            .fill(color)
+                    }
+                }
                     .frame(width: w, height: currentBarHeight)
                     .overlay(alignment: .leading) {
                         if !labelText.isEmpty {
@@ -113,9 +125,14 @@ struct TagTimelineBarsView: View {
                     .clipped()
                     .overlay {
                         if bar.isActive {
-                            RoundedRectangle(cornerRadius: expandedCornerRadius)
-                                .fill(color)
-                                .modifier(PulseOpacity())
+                            UnevenRoundedRectangle(
+                                topLeadingRadius: expandedCornerRadius,
+                                bottomLeadingRadius: expandedCornerRadius,
+                                bottomTrailingRadius: 0,
+                                topTrailingRadius: 0
+                            )
+                            .fill(color)
+                            .modifier(PulseOpacity())
                         }
                     }
                     .contentShape(Rectangle())
@@ -341,11 +358,11 @@ private struct PulseOpacity: ViewModifier {
     func body(content: Content) -> some View {
         content
             .opacity(pulsing ? 0.6 : 0)
-            .animation(
-                .easeInOut(duration: 1.2).repeatForever(autoreverses: true),
-                value: pulsing
-            )
-            .onAppear { pulsing = true }
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                    pulsing = true
+                }
+            }
     }
 }
 

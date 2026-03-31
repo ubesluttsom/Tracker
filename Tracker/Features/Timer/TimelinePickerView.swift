@@ -4,7 +4,7 @@ import SwiftUI
 struct TimelinePickerView: View {
   @Binding var selectedTime: Date
   var sessions: [Session]
-  var visibleHours: Double = 4.0
+  @Binding var visibleHours: Double
   var activeTags: [String] = []
   var activeSessionStart: Date?
   @Binding var isInteracting: Bool
@@ -12,6 +12,8 @@ struct TimelinePickerView: View {
   var isScrubbing: Bool = false
   var alwaysExpanded: Bool = false
   var onBarTap: ((TagBar) -> Void)?
+  var onEmptyTap: (() -> Void)?
+  var onNowTap: (() -> Void)?
 
   // --- Drag state ---
   @State private var dragAnchor: Date?
@@ -30,6 +32,9 @@ struct TimelinePickerView: View {
   // --- Expansion ---
   @State private var isExpanded: Bool = false
   @State private var collapseTask: Task<Void, Never>?
+
+  // --- Pinch-to-zoom ---
+  @State private var zoomAnchor: Double?
 
   // --- Pickers ---
   @State private var showDatePicker: Bool = false
@@ -83,22 +88,33 @@ struct TimelinePickerView: View {
       )
 
       ZStack {
-        tickCanvas(ctx)
-        tagBars(ctx)
-        accentTickOverlay(ctx)
-        scrubIndicator(ctx)
+        // Masked layer: ticks, bars, lines
+        ZStack {
+          tickCanvas(ctx)
+          tagBars(ctx)
+          nowLine(ctx)
+          accentTickOverlay(ctx)
+          nowTick(ctx)
+          scrubIndicator(ctx)
+        }
+        .modifier(TimelineEdgeFade())
+
+        // Unmasked layer: labels float above the fade
         hourLabels(ctx)
         centerTapTarget(ctx)
         dateLabel(ctx)
+        nowLabel(ctx)
       }
       .frame(width: ctx.width, height: totalHeight)
       .contentShape(Rectangle())
       .simultaneousGesture(timelineDragGesture(pps: ctx.pps))
+      .simultaneousGesture(pinchZoomGesture())
       .sensoryFeedback(.selection, trigger: tickHapticTrigger)
       .sensoryFeedback(.impact(weight: .heavy), trigger: snapHapticTrigger)
       .onTapGesture {
         expandBars()
         scheduleCollapse()
+        onEmptyTap?()
       }
     }
     .frame(height: totalHeight)
@@ -115,7 +131,7 @@ struct TimelinePickerView: View {
     Canvas { context, size in
       drawTicks(context: &context, size: size,
                 windowStart: ctx.windowStart, pps: ctx.pps,
-                skipTick: ctx.accentSnappedTick)
+                skipTicks: [ctx.accentSnappedTick, ctx.nowSnappedTick].compactMap { $0 })
     }
     .frame(width: ctx.width, height: totalHeight)
   }
@@ -182,6 +198,47 @@ struct TimelinePickerView: View {
   }
 
   @ViewBuilder
+  private func nowLine(_ ctx: TimelineContext) -> some View {
+    if activeSessionStart != nil {
+      TimelineView(.periodic(from: .now, by: 60)) { tlContext in
+        let nx = tlContext.date.timeIntervalSince(ctx.windowStart) * ctx.pps
+        Rectangle()
+          .fill(Color.red.opacity(0.5))
+          .frame(width: 1, height: totalHeight - ctx.baseline)
+          .position(x: nx, y: ctx.baseline + (totalHeight - ctx.baseline) / 2)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func nowTick(_ ctx: TimelineContext) -> some View {
+    if activeSessionStart != nil {
+      TimelineView(.periodic(from: .now, by: 60)) { tlContext in
+        let now = tlContext.date
+        let nowX = now.timeIntervalSince(ctx.windowStart) * ctx.pps
+        let nowSecs = now.timeIntervalSinceReferenceDate
+        let snapped300 = (nowSecs / 300).rounded() * 300
+        let snappedTick = Date(timeIntervalSinceReferenceDate: snapped300)
+        let tickX = snappedTick.timeIntervalSince(ctx.windowStart) * ctx.pps
+        let minute = Calendar.current.component(.minute, from: snappedTick)
+        let tickCenterY: CGFloat = {
+          if minute == 0 { return ctx.baseline - hourTickHeight / 2 }
+          else if minute % 15 == 0 { return ctx.baseline - quarterTickHeight / 2 }
+          else { return ctx.baseline - fiveMinDotRadius }
+        }()
+
+        NowTickShape(minute: minute, isCaptured: true)
+          .modifier(SlidingPosition(
+            progress: 1,
+            fromX: tickX,
+            toX: nowX,
+            y: tickCenterY
+          ))
+      }
+    }
+  }
+
+  @ViewBuilder
   private func scrubIndicator(_ ctx: TimelineContext) -> some View {
     if isScrubbing {
       // Vertical line at the center showing the scrub position
@@ -216,11 +273,16 @@ struct TimelinePickerView: View {
       let hour = Calendar.current.component(.hour, from: hourDate)
       let labelOpacity: Double = {
         guard !(ctx.midnightInView && hour == 0) else { return 0 }
-        let dist = abs(naturalX - ctx.dateLabelX)
         let threshold: CGFloat = 80
-        guard dist < threshold else { return 1.0 }
-        let t = dist / threshold
-        return Double(t * t * (3 - 2 * t))
+        let dateDist = abs(naturalX - ctx.dateLabelX)
+        let dateFade: Double = dateDist < threshold
+          ? { let t = dateDist / threshold; return Double(t * t * (3 - 2 * t)) }()
+          : 1.0
+        let nowDist = abs(naturalX - ctx.nowDisplayX)
+        let nowFade: Double = nowDist < threshold
+          ? { let t = nowDist / threshold; return Double(t * t * (3 - 2 * t)) }()
+          : 1.0
+        return min(dateFade, nowFade)
       }()
 
       Group {
@@ -238,7 +300,6 @@ struct TimelinePickerView: View {
         }
       }
       .opacity(labelOpacity)
-      .blur(radius: (1.0 - labelOpacity) * 3)
       .modifier(SlidingPosition(
         progress: isCaptured ? 1 : 0,
         fromX: naturalX,
@@ -273,6 +334,31 @@ struct TimelinePickerView: View {
       y: ctx.labelY
     ))
     .animation(.spring(duration: 0.18, bounce: 0.15), value: ctx.midnightInView)
+  }
+
+  private func nowLabel(_ ctx: TimelineContext) -> some View {
+    NowLabelContent(ctx: ctx, hasActiveSession: activeSessionStart != nil, onNowTap: onNowTap)
+  }
+
+  // MARK: - Pinch-to-Zoom
+
+  private func pinchZoomGesture() -> some Gesture {
+    MagnifyGesture()
+      .onChanged { value in
+        if zoomAnchor == nil {
+          zoomAnchor = visibleHours
+          stopMomentum()
+          isInteracting = true
+          expandBars()
+        }
+        let newHours = (zoomAnchor! / value.magnification).clamped(to: 0.5...12)
+        visibleHours = newHours
+      }
+      .onEnded { _ in
+        zoomAnchor = nil
+        isInteracting = false
+        scheduleCollapse()
+      }
   }
 
   // MARK: - Sheet Content
@@ -469,7 +555,7 @@ struct TimelinePickerView: View {
   private func drawTicks(
     context: inout GraphicsContext, size: CGSize,
     windowStart: Date, pps: Double,
-    skipTick: Date? = nil
+    skipTicks: [Date] = []
   ) {
     let calendar = Calendar.current
     let totalMinutes = Int(visibleHours * 60)
@@ -480,7 +566,7 @@ struct TimelinePickerView: View {
       let tickDate = startMinute.addingTimeInterval(Double(i) * 60)
       let minute = calendar.component(.minute, from: tickDate)
       guard minute % 5 == 0 else { continue }
-      if let skip = skipTick, abs(skip.timeIntervalSince(tickDate)) < 1 { continue }
+      if skipTicks.contains(where: { abs($0.timeIntervalSince(tickDate)) < 1 }) { continue }
       let x = tickDate.timeIntervalSince(windowStart) * pps
 
       if minute == 0 {
@@ -553,8 +639,15 @@ private struct TimelineContext {
   let midnightX: CGFloat
   let dateLabelX: CGFloat
 
+  // Now indicator
+  let nowX: CGFloat
+  let nowDisplayX: CGFloat
+
   // Accent tick
   let accentSnappedTick: Date?
+
+  // Now tick
+  let nowSnappedTick: Date?
 
   init(
     selectedTime: Date,
@@ -581,9 +674,20 @@ private struct TimelineContext {
     self.midnightX = d.timeIntervalSince(windowStart) * pps
     self.dateLabelX = midnightInView ? midnightX : 30
 
+    // Now indicator
+    let nx = Date().timeIntervalSince(windowStart) * pps
+    self.nowX = nx
+    self.nowDisplayX = (nx >= 0 && nx <= width) ? nx : width - 30
+
     // Accent tick
     self.accentSnappedTick = activeSessionStart.map { _ in
       let secs = selectedTime.timeIntervalSinceReferenceDate
+      return Date(timeIntervalSinceReferenceDate: (secs / 300).rounded() * 300)
+    }
+
+    // Now tick — snap to nearest 5-min mark
+    self.nowSnappedTick = activeSessionStart.map { _ in
+      let secs = Date().timeIntervalSinceReferenceDate
       return Date(timeIntervalSinceReferenceDate: (secs / 300).rounded() * 300)
     }
   }
@@ -636,10 +740,132 @@ private struct AccentTickShape: View {
   }
 }
 
+// MARK: - Now Tick
+
+private struct NowTickShape: View {
+  let minute: Int
+  let isCaptured: Bool
+
+  var body: some View {
+    if minute == 0 {
+      RoundedRectangle(cornerRadius: 0.75)
+        .fill(Color.red.opacity(0.8))
+        .frame(width: isCaptured ? 2 : 1.5, height: isCaptured ? 10 : 8)
+    } else if minute % 15 == 0 {
+      RoundedRectangle(cornerRadius: 0.75)
+        .fill(Color.red.opacity(0.8))
+        .frame(width: isCaptured ? 2 : 1.5, height: isCaptured ? 6 : 4)
+    } else {
+      Circle()
+        .fill(Color.red.opacity(0.8))
+        .frame(width: isCaptured ? 3 : 2, height: isCaptured ? 3 : 2)
+    }
+  }
+}
+
+// MARK: - Now Label
+
+private struct NowLabelContent: View {
+  let ctx: TimelineContext
+  var hasActiveSession: Bool = false
+  var onNowTap: (() -> Void)?
+
+  @State private var pulsing = false
+
+  private func nowX(for date: Date) -> CGFloat {
+    date.timeIntervalSince(ctx.windowStart) * ctx.pps
+  }
+
+  private func isInView(for date: Date) -> Bool {
+    let x = nowX(for: date)
+    return x >= 0 && x <= ctx.width
+  }
+
+  private func fadeOpacity(for date: Date) -> Double {
+    let x = nowX(for: date)
+    let inView = x >= 0 && x <= ctx.width
+    let displayX = inView ? x : ctx.width - 30
+    let dist = abs(displayX - ctx.dateLabelX)
+    let threshold: CGFloat = 80
+    guard dist < threshold else { return 1.0 }
+    let t = dist / threshold
+    return Double(t * t * (3 - 2 * t))
+  }
+
+  var body: some View {
+    TimelineView(.periodic(from: .now, by: 60)) { tlContext in
+      nowButton(now: tlContext.date)
+    }
+  }
+
+  private func nowButton(now: Date) -> some View {
+    let x = nowX(for: now)
+    let inView = isInView(for: now)
+    let edgeX = ctx.width - 30
+
+    return Button { onNowTap?() } label: {
+      if hasActiveSession {
+        Text(now.formatted(.dateTime.hour().minute()))
+          .font(.caption2.monospacedDigit().bold())
+          .foregroundStyle(.white)
+          .padding(.horizontal, 6)
+          .padding(.vertical, 2)
+          .background(
+            Capsule().fill(.red.opacity(pulsing ? 0.6 : 0.85))
+          )
+          .onAppear {
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+              pulsing = true
+            }
+          }
+      } else {
+        Text(now.formatted(.dateTime.hour().minute()))
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .buttonStyle(.plain)
+    .opacity(fadeOpacity(for: now))
+    .modifier(SlidingPosition(
+      progress: inView ? 1 : 0,
+      fromX: edgeX,
+      toX: x,
+      y: ctx.labelY
+    ))
+    .animation(.spring(duration: 0.18, bounce: 0.15), value: inView)
+  }
+}
+
 // MARK: - Helpers
 
 private extension Date {
   func nearestMinute() -> Date {
     Date(timeIntervalSinceReferenceDate: (timeIntervalSinceReferenceDate / 60).rounded() * 60)
+  }
+}
+
+private extension Comparable {
+  func clamped(to range: ClosedRange<Self>) -> Self {
+    min(max(self, range.lowerBound), range.upperBound)
+  }
+}
+
+// MARK: - Edge Fade
+
+private struct TimelineEdgeFade: ViewModifier {
+  private let stops: CGFloat = 0.10
+
+  func body(content: Content) -> some View {
+    content.mask(
+      LinearGradient(
+        stops: [
+          .init(color: .clear, location: 0),
+          .init(color: .black, location: stops),
+          .init(color: .black, location: 1 - stops),
+          .init(color: .clear, location: 1),
+        ],
+        startPoint: .leading, endPoint: .trailing
+      )
+    )
   }
 }

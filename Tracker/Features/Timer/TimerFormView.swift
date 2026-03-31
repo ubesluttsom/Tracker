@@ -83,16 +83,34 @@ struct TimerFormView: View {
         TimelinePickerView(
           selectedTime: timelineBinding,
           sessions: viewModel.todaySessions,
-          visibleHours: visibleHours,
+          visibleHours: $visibleHours,
           activeTags: viewModel.sessionTags,
           activeSessionStart: viewModel.timerRunning ? viewModel.startTime : nil,
           isInteracting: $timelineInteracting,
           highlightedSessionIDs: highlightedSessionIDs,
           isScrubbing: scrubField != nil,
           alwaysExpanded: viewModel.timerRunning,
-          onBarTap: { bar in handleBarTap(bar) }
+          onBarTap: { bar in handleBarTap(bar) },
+          onEmptyTap: {
+            guard editTarget != nil else { return }
+            withAnimation { editTarget = nil; scrubField = nil }
+            resetVisibleHours()
+          },
+          onNowTap: {
+            withAnimation(.easeInOut(duration: 0.4)) {
+              viewportCenter = Date()
+              visibleHours = 4.0
+            }
+            if viewModel.timerRunning {
+              withAnimation { editTarget = .active }
+              if let start = viewModel.startTime {
+                zoomToFit(session: nil, start: start, end: Date())
+              }
+            } else {
+              withAnimation { editTarget = nil; scrubField = nil }
+            }
+          }
         )
-        .modifier(TimelineEdgeFade())
         .padding(.vertical, 4)
 
         List {
@@ -473,27 +491,6 @@ struct TimerFormView: View {
       }
     }
     .presentationDetents([.medium])
-  }
-}
-
-// MARK: - Edge Fade + Blur
-
-/// Fades the timeline out at the left and right edges.
-private struct TimelineEdgeFade: ViewModifier {
-  private let stops: CGFloat = 0.10  // fraction of width that fades
-
-  func body(content: Content) -> some View {
-    content.mask(
-      LinearGradient(
-        stops: [
-          .init(color: .clear, location: 0),
-          .init(color: .black, location: stops),
-          .init(color: .black, location: 1 - stops),
-          .init(color: .clear, location: 1),
-        ],
-        startPoint: .leading, endPoint: .trailing
-      )
-    )
   }
 }
 

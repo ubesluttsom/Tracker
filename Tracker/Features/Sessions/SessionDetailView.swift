@@ -15,6 +15,7 @@ struct SessionDetailView: View {
   @State private var editStartDate: Date = Date()
   @State private var editEndDate: Date = Date()
   @State private var timelineInteracting = false
+  @State private var visibleHours: Double = 4.0
 
   var body: some View {
     NavigationView {
@@ -41,6 +42,7 @@ struct SessionDetailView: View {
             TimelinePickerView(
               selectedTime: $editStartDate,
               sessions: sessions,
+              visibleHours: $visibleHours,
               activeTags: editTags,
               isInteracting: $timelineInteracting
             )
