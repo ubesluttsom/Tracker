@@ -3,7 +3,7 @@ import ActivityKit
 
 // Uses iOS 17's @Observable macro instead of ObservableObject + @Published.
 // SwiftUI automatically tracks property access in view bodies — no wrappers needed.
-@Observable class ContentViewModel {
+@MainActor @Observable class ContentViewModel {
     // Singleton so all views share one timer/event state and the AppDelegate
     // can update the Live Activity from a background task.
     static let shared = ContentViewModel()
@@ -11,11 +11,24 @@ import ActivityKit
     var sessionStore: SessionStore?
 
     var startTime: Date?
-    var timerString: String = "--:--:--"
     var timerRunning = false
-    var sessionName: String = ""
-    var sessionNotes: String = ""
-    var sessionTags: [String] = []
+    var sessionName: String = "" {
+        didSet {
+            saveTimerStateIfRunning()
+            updateLiveActivityIfRunning()
+        }
+    }
+    var sessionNotes: String = "" {
+        didSet {
+            saveTimerStateIfRunning()
+            updateLiveActivityIfRunning()
+        }
+    }
+    var sessionTags: [String] = [] {
+        didSet {
+            saveTimerStateIfRunning()
+        }
+    }
     var showTextField: Bool = true
     var showAll = false
     var showStatistics = false
@@ -23,9 +36,7 @@ import ActivityKit
     var selectedSession: Session?
     var showDailyTotal: Bool = false
     var dailyTotalFilterTags: [String] = []
-    private var currentDate: Date = Date()
 
-    private var timer: Timer?
     private var liveActivity: Activity<TimerWidgetAttributes>?
 
     private init() {} // Private initializer to prevent additional instances
@@ -37,14 +48,9 @@ import ActivityKit
         timerRunning = true
         saveTimerState()
         startLiveActivity()
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            self.updateTimerString()
-            self.updateLiveActivity()
-        }
     }
 
     func stopTimer() {
-        timer?.invalidate()
         timerRunning = false
         saveTimerState()
         AppDelegate.cancelAppRefresh() // Cancel the background task
@@ -61,6 +67,32 @@ import ActivityKit
         }
         endLiveActivity()
         startTime = nil
+    }
+
+    func stopAndSave() {
+        stopTimer()
+    }
+
+    func startBreak() {
+        let previousName = sessionName
+        let previousTags = sessionTags.filter { $0 != "Break" }
+        stopTimer()
+        sessionName = previousName
+        sessionNotes = ""
+        sessionTags = previousTags + ["Break"]
+        startTime = Date()
+        startTimer()
+    }
+
+    func endBreak() {
+        let previousName = sessionName
+        let previousTags = sessionTags.filter { $0 != "Break" }
+        stopTimer()
+        sessionName = previousName
+        sessionNotes = ""
+        sessionTags = previousTags
+        startTime = Date()
+        startTimer()
     }
 
     func toggleTimer() {
@@ -81,24 +113,19 @@ import ActivityKit
     func adjustStartTime(by seconds: TimeInterval) {
         guard let currentStartTime = startTime else {
             startTime = Date().addingTimeInterval(seconds)
-            updateTimerString()
             return
         }
         startTime = currentStartTime.addingTimeInterval(seconds)
         if timerRunning {
             startTime = Date().addingTimeInterval(-Date().timeIntervalSince(startTime!))
         }
-        updateTimerString()
     }
 
-    func updateTimerString() {
-        currentDate = Date()
-        guard let start = startTime else {
-            timerString = "--:--:--"
-            return
+    func timerString(at now: Date) -> String {
+        guard let start = startTime, timerRunning else {
+            return "--:--:--"
         }
-        let elapsed = currentDate.timeIntervalSince(start)
-        timerString = formatTime(elapsed)
+        return formatTime(now.timeIntervalSince(start))
     }
 
     func openCalendarApp() {
@@ -123,7 +150,7 @@ import ActivityKit
         return savedTags.union(currentTags).sorted()
     }
 
-    var dailyTotalString: String {
+    func dailyTotalString(at now: Date) -> String {
         var filtered = todaySessions
         if !dailyTotalFilterTags.isEmpty {
             filtered = filtered.filter { session in
@@ -137,7 +164,7 @@ import ActivityKit
             let currentMatches = dailyTotalFilterTags.isEmpty ||
                 sessionTags.contains(where: dailyTotalFilterTags.contains)
             if currentMatches {
-                total += currentDate.timeIntervalSince(start)
+                total += now.timeIntervalSince(start)
             }
         }
 
@@ -164,14 +191,12 @@ import ActivityKit
     }
 
     func discardActiveSession() {
-        timer?.invalidate()
         timerRunning = false
         endLiveActivity()
         startTime = nil
         sessionName = ""
         sessionNotes = ""
         sessionTags = []
-        updateTimerString()
         saveTimerState()
     }
 
@@ -233,6 +258,8 @@ import ActivityKit
         updateSession(target)
     }
 
+    // MARK: - Live Activity
+
     private func startLiveActivity() {
         if ActivityAuthorizationInfo().areActivitiesEnabled {
             let attributes = TimerWidgetAttributes()
@@ -273,14 +300,15 @@ import ActivityKit
         )
         Task {
             await activity.end(ActivityContent(state: finalState, staleDate: nil), dismissalPolicy: .immediate)
-            
         }
     }
 
     func updateLiveActivityInBackground() {
         updateLiveActivity()
     }
-    
+
+    // MARK: - Timer State Persistence
+
     // Persist timer state to UserDefaults so a running timer survives app
     // termination (e.g. system kill while backgrounded). loadTimerState()
     // restores it on next launch.
@@ -292,6 +320,16 @@ import ActivityKit
         UserDefaults.standard.set(sessionTags, forKey: "sessionTags")
     }
 
+    private func saveTimerStateIfRunning() {
+        guard timerRunning else { return }
+        saveTimerState()
+    }
+
+    private func updateLiveActivityIfRunning() {
+        guard timerRunning else { return }
+        updateLiveActivity()
+    }
+
     func loadTimerState() {
         if UserDefaults.standard.bool(forKey: "timerRunning") {
             startTime = UserDefaults.standard.object(forKey: "startTime") as? Date
@@ -299,12 +337,7 @@ import ActivityKit
             sessionName = UserDefaults.standard.string(forKey: "sessionName") ?? ""
             sessionNotes = UserDefaults.standard.string(forKey: "sessionNotes") ?? ""
             sessionTags = UserDefaults.standard.array(forKey: "sessionTags") as? [String] ?? []
-            // Restart the timer
             startLiveActivity()
-            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-                self.updateTimerString()
-                self.updateLiveActivity()
-            }
         } else {
             timerRunning = false
             startTime = nil

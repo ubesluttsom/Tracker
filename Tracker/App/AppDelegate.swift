@@ -50,9 +50,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 }
 
-class RefreshAppContentsOperation: Operation {
+class RefreshAppContentsOperation: Operation, @unchecked Sendable {
     override func main() {
         if isCancelled { return }
-        ContentViewModel.shared.updateLiveActivityInBackground()
+        Task { @MainActor in
+            ContentViewModel.shared.updateLiveActivityInBackground()
+        }
     }
 }

@@ -40,21 +40,24 @@ struct NowPlayingBar: View {
     // MARK: - Timer / Daily Total Text
 
     private var timerText: some View {
-        HStack(spacing: 6) {
-            Text(viewModel.showDailyTotal ? viewModel.dailyTotalString : viewModel.timerString)
-                .font(.title2)
-                .fontWeight(.medium)
-                .monospaced()
-                .foregroundColor(.primary)
-                .contentTransition(.numericText())
-
-            if viewModel.showDailyTotal && viewModel.isDailyTotalFiltered {
-                Text("(*)")
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            let now = timeline.date
+            HStack(spacing: 6) {
+                Text(displayString(at: now))
                     .font(.title2)
                     .fontWeight(.medium)
                     .monospaced()
                     .foregroundColor(.primary)
                     .contentTransition(.numericText())
+
+                if viewModel.showDailyTotal && viewModel.isDailyTotalFiltered {
+                    Text("(*)")
+                        .font(.title2)
+                        .fontWeight(.medium)
+                        .monospaced()
+                        .foregroundColor(.primary)
+                        .contentTransition(.numericText())
+                }
             }
         }
         .onTapGesture {
@@ -65,6 +68,13 @@ struct NowPlayingBar: View {
                 viewModel.showDailyTotal.toggle()
             }
         }
+    }
+
+    private func displayString(at now: Date) -> String {
+        if viewModel.showDailyTotal {
+            return viewModel.dailyTotalString(at: now)
+        }
+        return viewModel.timerString(at: now)
     }
 
     // MARK: - Play / Stop Button
@@ -81,10 +91,7 @@ struct NowPlayingBar: View {
 
     private var stopButton: some View {
         Button {
-            viewModel.toggleTimer()
-            viewModel.startTime = nil
-            viewModel.updateTimerString()
-            viewModel.fetchSessions()
+            viewModel.stopAndSave()
         } label: {
             Image(systemName: "stop.circle.fill")
                 .font(.system(size: 20))
@@ -93,10 +100,7 @@ struct NowPlayingBar: View {
         .sensoryFeedback(.start, trigger: viewModel.timerRunning)
         .contextMenu {
             Button {
-                viewModel.toggleTimer()
-                viewModel.startTime = nil
-                viewModel.updateTimerString()
-                viewModel.fetchSessions()
+                viewModel.stopAndSave()
             } label: {
                 Label("Stop & Save", systemImage: "square.and.arrow.down")
             }
@@ -107,33 +111,17 @@ struct NowPlayingBar: View {
             }
             if viewModel.sessionTags.contains("Break") {
                 Button {
-                    viewModel.toggleTimer()
-                    viewModel.startTime = nil
-                    viewModel.updateTimerString()
-                    viewModel.fetchSessions()
-                    if viewModel.startTime == nil {
-                        viewModel.startTime = Date()
-                    }
-                    viewModel.toggleTimer()
-                    viewModel.sessionTags.removeAll { $0 == "Break" }
+                    viewModel.endBreak()
                 } label: {
                     Label("End Break", systemImage: "cup.and.heat.waves.fill")
                 }
             } else {
-            Button {
-                viewModel.toggleTimer()
-                viewModel.startTime = nil
-                viewModel.updateTimerString()
-                viewModel.fetchSessions()
-                if viewModel.startTime == nil {
-                    viewModel.startTime = Date()
+                Button {
+                    viewModel.startBreak()
+                } label: {
+                    Label("Break", systemImage: "cup.and.heat.waves.fill")
                 }
-                viewModel.toggleTimer()
-                viewModel.sessionTags.append(contentsOf: ["Break"])
-            } label: {
-                Label("Break", systemImage: "cup.and.heat.waves.fill")
             }
-        }
         }
     }
 

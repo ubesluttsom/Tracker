@@ -400,15 +400,17 @@ struct TimerFormView: View {
               .background(scrubField == .start ? Color.blue.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
             }
 
-            VStack(spacing: 2) {
-              Text(formatDuration(Date().timeIntervalSince(startTime)))
-                .font(.body.weight(.medium))
-                .foregroundStyle(.secondary)
-              Image(systemName: "capsule.lefthalf.filled")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            TimelineView(.periodic(from: .now, by: 1)) { timeline in
+              VStack(spacing: 2) {
+                Text(formatDuration(timeline.date.timeIntervalSince(startTime)))
+                  .font(.body.weight(.medium))
+                  .foregroundStyle(.secondary)
+                Image(systemName: "capsule.lefthalf.filled")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+              .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity)
           }
           .buttonStyle(.plain)
         }

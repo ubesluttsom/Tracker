@@ -28,8 +28,10 @@
 
 ## Code Health
 
-- [ ] Add `@MainActor` to `ContentViewModel` — it drives UI and assumes
-      main-thread access everywhere.
+- [x] Add `@MainActor` to `ContentViewModel` — it drives UI and assumes
+      main-thread access everywhere. **Done**: Added `@MainActor` annotation.
+      Background refresh operation wrapped in `Task { @MainActor in }`.
+      Per-second `Timer.scheduledTimer` replaced with `TimelineView` in views.
 
 - [ ] Consolidate the three copies of `formatTime` (ContentViewModel,
       TimerWidgetLiveActivity, TimerWidget) into a shared utility.
@@ -66,13 +68,10 @@
       from `TrackerApp.init()` because the singleton lives outside the view
       hierarchy.
 
-- [ ] Persist active session edits to UserDefaults in real time.
-      Currently `saveTimerState()` is only called from `startTimer()` and
-      `stopTimer()`. If the user edits tags/title/notes mid-session and the
-      app is killed, those edits are lost. Needs either: (a) call
-      `saveTimerState()` on every field change (e.g. `onChange` or `didSet`),
-      or (b) a periodic auto-save, or (c) move active session state into
-      SwiftData so it's always persisted.
+- [x] Persist active session edits to UserDefaults in real time.
+      **Done**: Added `didSet` observers on `sessionName`, `sessionNotes`,
+      and `sessionTags` that call `saveTimerStateIfRunning()` and
+      `updateLiveActivityIfRunning()` on every change.
 
 ## Stories
 
