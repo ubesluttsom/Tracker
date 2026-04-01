@@ -59,15 +59,23 @@ struct TimelinePickerView: View {
   private let hapticTickMinutes: Int = 5
 
   private let tickAreaHeight: CGFloat = 34
+  private let labelAreaHeight: CGFloat = 20
 
   private var effectiveExpanded: Bool { alwaysExpanded || isExpanded }
 
-  private var totalHeight: CGFloat {
+  private var barAreaHeight: CGFloat {
     let maxTags = TagTimelineBarsView.maxTagCount(
       sessions: sessions, activeTags: activeTags,
       hasActiveSession: activeSessionStart != nil
     )
-    return tickAreaHeight + TagTimelineBarsView.barAreaHeight(maxTagCount: maxTags, isExpanded: effectiveExpanded)
+    // Cap at 4 rows so the timeline doesn't grow too tall.
+    // Always use expanded dimensions so the container height doesn't jump.
+    let cappedTags = min(maxTags, 4)
+    return TagTimelineBarsView.barAreaHeight(maxTagCount: cappedTags, isExpanded: true)
+  }
+
+  private var totalHeight: CGFloat {
+    barAreaHeight + tickAreaHeight + labelAreaHeight
   }
 
   // A label snaps to center when it's the closest AND within
@@ -82,7 +90,9 @@ struct TimelinePickerView: View {
         selectedTime: selectedTime,
         visibleHours: visibleHours,
         width: geo.size.width,
+        barAreaHeight: barAreaHeight,
         tickAreaHeight: tickAreaHeight,
+        labelAreaHeight: labelAreaHeight,
         hourTickHeight: hourTickHeight,
         activeSessionStart: activeSessionStart
       )
@@ -101,7 +111,7 @@ struct TimelinePickerView: View {
 
         // Unmasked layer: labels float above the fade
         hourLabels(ctx)
-        centerTapTarget(ctx)
+        //centerTapTarget(ctx)
         dateLabel(ctx)
         nowLabel(ctx)
       }
@@ -147,7 +157,7 @@ struct TimelinePickerView: View {
         windowStart: ctx.windowStart,
         windowEnd: ctx.windowEnd,
         pps: ctx.pps,
-        baseline: tickAreaHeight,
+        baseline: barAreaHeight,
         now: tlContext.date,
         isExpanded: effectiveExpanded,
         visibleWidth: ctx.width,
@@ -204,8 +214,8 @@ struct TimelinePickerView: View {
         let nx = tlContext.date.timeIntervalSince(ctx.windowStart) * ctx.pps
         Rectangle()
           .fill(Color.red.opacity(0.5))
-          .frame(width: 1, height: totalHeight - ctx.baseline)
-          .position(x: nx, y: ctx.baseline + (totalHeight - ctx.baseline) / 2)
+          .frame(width: 1, height: ctx.barsAndTicksHeight)
+          .position(x: nx, y: ctx.barsAndTicksHeight / 2)
       }
     }
   }
@@ -244,14 +254,14 @@ struct TimelinePickerView: View {
       // Vertical line at the center showing the scrub position
       RoundedRectangle(cornerRadius: 1)
         .fill(Color.accentColor.opacity(0.6))
-        .frame(width: 2, height: totalHeight - ctx.labelY)
-        .position(x: ctx.centerX, y: ctx.labelY + (totalHeight - ctx.labelY) / 2)
+        .frame(width: 2, height: ctx.barsAndTicksHeight)
+        .position(x: ctx.centerX, y: ctx.barsAndTicksHeight / 2)
 
-      // Small diamond handle at top
+      // Small diamond handle at top (near topmost bar)
       Image(systemName: "diamond.fill")
         .font(.system(size: 8))
         .foregroundStyle(.blue)
-        .position(x: ctx.centerX, y: ctx.labelY + 4)
+        .position(x: ctx.centerX, y: 4)
     }
   }
 
@@ -560,7 +570,7 @@ struct TimelinePickerView: View {
     let calendar = Calendar.current
     let totalMinutes = Int(visibleHours * 60)
     let startMinute = calendar.dateInterval(of: .minute, for: windowStart)?.start ?? windowStart
-    let baseline = tickAreaHeight
+    let baseline = barAreaHeight + tickAreaHeight
 
     for i in 0...totalMinutes {
       let tickDate = startMinute.addingTimeInterval(Double(i) * 60)
@@ -649,11 +659,16 @@ private struct TimelineContext {
   // Now tick
   let nowSnappedTick: Date?
 
+  // The zone from the top of bars down through the ticks (excludes labels).
+  let barsAndTicksHeight: CGFloat
+
   init(
     selectedTime: Date,
     visibleHours: Double,
     width: CGFloat,
+    barAreaHeight: CGFloat,
     tickAreaHeight: CGFloat,
+    labelAreaHeight: CGFloat,
     hourTickHeight: CGFloat,
     activeSessionStart: Date?
   ) {
@@ -662,8 +677,11 @@ private struct TimelineContext {
     self.windowStart = selectedTime.addingTimeInterval(-visibleHours * 3600 / 2)
     self.windowEnd = selectedTime.addingTimeInterval(visibleHours * 3600 / 2)
     self.centerX = width / 2
-    self.baseline = tickAreaHeight
-    self.labelY = tickAreaHeight - hourTickHeight - 12
+    // Layout (top to bottom): barArea | tickArea | labelArea
+    // baseline = bottom of tick area (ticks draw upward from here)
+    self.baseline = barAreaHeight + tickAreaHeight
+    self.barsAndTicksHeight = barAreaHeight + tickAreaHeight
+    self.labelY = barAreaHeight + tickAreaHeight + labelAreaHeight / 2
 
     // Midnight
     let cal = Calendar.current

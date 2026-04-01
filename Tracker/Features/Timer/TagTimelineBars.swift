@@ -73,7 +73,7 @@ struct TagTimelineBarsView: View {
         let bars = computeTagBars()
         let currentBarHeight = isExpanded ? Self.expandedBarHeight : Self.barHeight
         let currentGap = isExpanded ? Self.expandedBarGap : Self.barGap
-        let baseY = baseline + Self.topOffset + currentBarHeight / 2
+        let baseY = baseline - Self.topOffset - currentBarHeight / 2
         let expandedCornerRadius: CGFloat = isExpanded ? expandedCornerRadius : cornerRadius
         ZStack(alignment: .topLeading) {
             ForEach(bars) { bar in
@@ -89,7 +89,7 @@ struct TagTimelineBarsView: View {
                     ? Color.gray.opacity((bar.isActive ? 0.4 : 0.15) * dimFactor)
                     : TagColor.color(for: bar.tag).opacity((bar.isActive ? 0.5 : 0.3) * dimFactor)
 
-                let rowOffset = CGFloat(bar.tagIndex) * (currentBarHeight + currentGap)
+                let rowOffset = -CGFloat(bar.tagIndex) * (currentBarHeight + currentGap)
 
                 let labelText = bar.tag.isEmpty ? bar.label : bar.tag
                 let labelColor = bar.tag.isEmpty

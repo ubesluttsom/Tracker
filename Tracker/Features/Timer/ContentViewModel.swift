@@ -158,6 +158,33 @@ import ActivityKit
         dailyTotalFilterTags = sessionTags
     }
 
+    var isDailyTotalFiltered: Bool {
+        !dailyTotalFilterTags.isEmpty &&
+            Set(dailyTotalFilterTags) != Set(todayAvailableTags)
+    }
+
+    func discardActiveSession() {
+        timer?.invalidate()
+        timerRunning = false
+        endLiveActivity()
+        startTime = nil
+        sessionName = ""
+        sessionNotes = ""
+        sessionTags = []
+        updateTimerString()
+        saveTimerState()
+    }
+
+    func startWithLastSession() {
+        if let last = todaySessions.sorted(by: { $0.endDate > $1.endDate }).first {
+            sessionName = last.title
+            sessionNotes = ""
+            sessionTags = last.tags
+        }
+        startTime = Date()
+        startTimer()
+    }
+
     // MARK: - Delete & Update
 
     func deleteSession(at offsets: IndexSet) {

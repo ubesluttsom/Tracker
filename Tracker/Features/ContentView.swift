@@ -14,12 +14,7 @@ struct ContentView: View {
             }
           }
 
-          VStack(spacing: 4) {
-          TimerView(viewModel: viewModel).background(.clear)
-          if viewModel.showTextField {
-            TimerFormView(viewModel: viewModel)
-          }
-        }
+        TimerFormView(viewModel: viewModel)
         .sheet(isPresented: $viewModel.showAll) {
           ShowAllView(viewModel: viewModel)
         }

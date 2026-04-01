@@ -19,300 +19,435 @@ enum EditTarget: Equatable {
 // MARK: - Timer Form View
 
 struct TimerFormView: View {
-  @Bindable var viewModel: ContentViewModel
-  @State private var timelineInteracting = false
-  @State private var viewportCenter: Date = Date()
-  @State private var editTarget: EditTarget? = nil
-
-  // Editing state for saved sessions
-  @State private var editTitle: String = ""
-  @State private var editNotes: String = ""
-  @State private var editTags: [String] = []
-  @State private var editStartDate: Date = Date()
-  @State private var editEndDate: Date = Date()
-
-  // Scrub-editing
-  enum ScrubField { case start, end }
-  @State private var scrubField: ScrubField? = nil
-
-  // Zoom-to-fit
-  @State private var visibleHours: Double = 4.0
-
-  // Undo
-  @State private var undoSnapshot: (start: Date, end: Date)? = nil
-  @State private var showUndoToast: Bool = false
-  @State private var undoSession: Session? = nil
-  @State private var undoDismissTask: Task<Void, Never>? = nil
-
-  // Multi-session bar picker
-  @State private var barTapSessions: [Session] = []
-  @State private var showBarSessions: Bool = false
-
-  private var highlightedSessionIDs: Set<UUID> {
-    switch editTarget {
-    case .saved(let session): return [session.id]
-    case .active:
-      // For the active session, we don't have a persisted ID —
-      // the highlight is handled by the active bar styling
-      return []
-    case nil: return []
+    @Bindable var viewModel: ContentViewModel
+    @State private var timelineInteracting = false
+    @State private var viewportCenter: Date = Date()
+    @State private var editTarget: EditTarget? = nil
+    
+    // Editing state for saved sessions
+    @State private var editTitle: String = ""
+    @State private var editNotes: String = ""
+    @State private var editTags: [String] = []
+    @State private var editStartDate: Date = Date()
+    @State private var editEndDate: Date = Date()
+    
+    // Scrub-editing
+    enum ScrubField { case start, end }
+    @State private var scrubField: ScrubField? = nil
+    @FocusState private var textFieldFocused: Bool
+    
+    // Zoom-to-fit
+    @State private var visibleHours: Double = 4.0
+    @State private var pendingZoom: (start: Date, end: Date)? = nil
+    
+    // Undo
+    @State private var undoSnapshot: (start: Date, end: Date)? = nil
+    @State private var showUndoToast: Bool = false
+    @State private var undoSession: Session? = nil
+    @State private var undoDismissTask: Task<Void, Never>? = nil
+    
+    // Multi-session bar picker
+    @State private var barTapSessions: [Session] = []
+    @State private var showBarSessions: Bool = false
+    
+    // Session page navigation
+    @State private var selectedPageID: String = ""
+    
+    private static let activePageID = "__active__"
+    
+    /// All today's sessions sorted chronologically, plus active session at the end.
+    private var allPages: [(id: String, session: Session?)] {
+        let sorted = viewModel.todaySessions.sorted { $0.startDate < $1.startDate }
+        var pages = sorted.map { (id: $0.id.uuidString, session: Optional($0)) }
+        if viewModel.timerRunning {
+            pages.append((id: Self.activePageID, session: nil))
+        }
+        return pages
     }
-  }
-
-  /// The binding passed to the timeline — changes target based on scrub mode.
-  private var timelineBinding: Binding<Date> {
-    switch (editTarget, scrubField) {
-    case (.active, .start):
-      // Scrubbing the active session's start time
-      return Binding(
-        get: { viewModel.startTime ?? Date() },
-        set: { viewModel.startTime = $0 }
-      )
-    case (.saved, .start):
-      return $editStartDate
-    case (.saved, .end):
-      return $editEndDate
-    default:
-      return $viewportCenter
+    
+    private var highlightedSessionIDs: Set<UUID> {
+        switch editTarget {
+        case .saved(let session): return [session.id]
+        case .active:
+            // For the active session, we don't have a persisted ID —
+            // the highlight is handled by the active bar styling
+            return []
+        case nil: return []
+        }
     }
-  }
-
-  var body: some View {
-    ZStack(alignment: .bottom) {
-      VStack(spacing: 0) {
-        TimelinePickerView(
-          selectedTime: timelineBinding,
-          sessions: viewModel.todaySessions,
-          visibleHours: $visibleHours,
-          activeTags: viewModel.sessionTags,
-          activeSessionStart: viewModel.timerRunning ? viewModel.startTime : nil,
-          isInteracting: $timelineInteracting,
-          highlightedSessionIDs: highlightedSessionIDs,
-          isScrubbing: scrubField != nil,
-          alwaysExpanded: viewModel.timerRunning,
-          onBarTap: { bar in handleBarTap(bar) },
-          onEmptyTap: {
-            guard editTarget != nil else { return }
-            withAnimation { editTarget = nil; scrubField = nil }
-            resetVisibleHours()
-          },
-          onNowTap: {
-            withAnimation(.easeInOut(duration: 0.4)) {
-              viewportCenter = Date()
-              visibleHours = 4.0
+    
+    /// The binding passed to the timeline — changes target based on scrub mode.
+    private var timelineBinding: Binding<Date> {
+        switch (editTarget, scrubField) {
+        case (.active, .start):
+            // Scrubbing the active session's start time
+            return Binding(
+                get: { viewModel.startTime ?? Date() },
+                set: { viewModel.startTime = $0 }
+            )
+        case (.saved, .start):
+            return $editStartDate
+        case (.saved, .end):
+            return $editEndDate
+        default:
+            return $viewportCenter
+        }
+    }
+    
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            VStack(spacing: 0) {
+                if editTarget != nil {
+                    sessionPages
+                } else {
+                    List {
+                        if viewModel.showTextField {
+                            detailsSection
+                            
+                            Section(header: Text("Recents")) {
+                                SessionRecentsView(viewModel: viewModel)
+                            }
+                        }
+                    }
+                    .refreshable {
+                        viewModel.fetchSessions()
+                    }
+                    .scrollDisabled(timelineInteracting)
+                    .listStyle(InsetGroupedListStyle())
+                }
             }
-            if viewModel.timerRunning {
-              withAnimation { editTarget = .active }
-              if let start = viewModel.startTime {
-                zoomToFit(session: nil, start: start, end: Date())
-              }
-            } else {
-              withAnimation { editTarget = nil; scrubField = nil }
+            .sheet(isPresented: $showBarSessions) { barSessionsSheet }
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: 0) {
+                    TimelinePickerView(
+                        selectedTime: timelineBinding,
+                        sessions: viewModel.todaySessions,
+                        visibleHours: $visibleHours,
+                        activeTags: viewModel.sessionTags,
+                        activeSessionStart: viewModel.timerRunning ? viewModel.startTime : nil,
+                        isInteracting: $timelineInteracting,
+                        highlightedSessionIDs: highlightedSessionIDs,
+                        isScrubbing: scrubField != nil,
+                        alwaysExpanded: viewModel.timerRunning || editTarget != nil,
+                        onBarTap: { bar in handleBarTap(bar) },
+                        onEmptyTap: {
+                            guard editTarget != nil else { return }
+                            if case .saved(let session) = editTarget {
+                                finishEditing(session)
+                            } else {
+                                withAnimation { editTarget = nil; scrubField = nil }
+                                resetVisibleHours()
+                            }
+                        },
+                        onNowTap: {
+                            withAnimation(.easeInOut(duration: 0.4)) {
+                                viewportCenter = Date()
+                                visibleHours = 4.0
+                            }
+                            if viewModel.timerRunning {
+                                withAnimation { editTarget = .active }
+                                if let start = viewModel.startTime {
+                                    zoomToFit(session: nil, start: start, end: Date())
+                                }
+                            } else {
+                                withAnimation { editTarget = nil; scrubField = nil }
+                            }
+                        }
+                    )
+                    .padding(.vertical, 8)
+                    
+                    NowPlayingBar(viewModel: viewModel)
+                }
+                .background(.ultraThinMaterial)
             }
-          }
-        )
-        .padding(.vertical, 4)
-
+            
+            // Undo toast
+            if showUndoToast {
+                undoToast
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .padding(.bottom, 80)
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: showUndoToast)
+        .onChange(of: editStartDate) { _, newValue in
+            if scrubField == .start && newValue >= editEndDate {
+                editStartDate = editEndDate.addingTimeInterval(-60)
+            }
+            // Live update: write through to session
+            if scrubField == .start, case .saved(let session) = editTarget {
+                session.startDate = newValue
+            }
+        }
+        .onChange(of: editEndDate) { _, newValue in
+            if scrubField == .end && newValue <= editStartDate {
+                editEndDate = editStartDate.addingTimeInterval(60)
+            }
+            if scrubField == .end && newValue > Date() {
+                editEndDate = Date()
+            }
+            // Live update: write through to session
+            if scrubField == .end, case .saved(let session) = editTarget {
+                session.endDate = newValue
+            }
+        }
+        .onChange(of: textFieldFocused) { _, focused in
+            if focused && scrubField != nil {
+                withAnimation { scrubField = nil }
+            }
+        }
+        .onChange(of: viewportCenter) { _, newCenter in
+            guard editTarget != nil, scrubField == nil else { return }
+            if let session = viewModel.todaySessions.first(where: {
+                $0.startDate <= newCenter && newCenter <= $0.endDate
+            }) {
+                if case .saved(let current) = editTarget, current.id == session.id { return }
+                if case .saved(let outgoing) = editTarget {
+                    saveEditsToSession(outgoing)
+                }
+                editTitle = session.title
+                editNotes = session.notes
+                editTags = session.tags
+                editStartDate = session.startDate
+                editEndDate = session.endDate
+                undoSnapshot = (start: session.startDate, end: session.endDate)
+                selectedPageID = session.id.uuidString
+                withAnimation { editTarget = .saved(session) }
+            } else if viewModel.timerRunning,
+                      let start = viewModel.startTime,
+                      start <= newCenter && newCenter <= Date() {
+                guard editTarget != .active else { return }
+                if case .saved(let outgoing) = editTarget {
+                    saveEditsToSession(outgoing)
+                }
+                selectedPageID = Self.activePageID
+                withAnimation { editTarget = .active }
+            }
+        }
+        .onChange(of: timelineInteracting) { _, interacting in
+            if !interacting, let zoom = pendingZoom {
+                pendingZoom = nil
+                zoomToFit(session: nil, start: zoom.start, end: zoom.end)
+            }
+        }
+    }
+    
+    // MARK: - Details Section
+    
+    private var detailsSection: some View {
+        Section(header: Text("Details")) {
+            TextField("Title", text: $viewModel.sessionName)
+                .padding(.vertical, 4)
+                .onAppear {
+                    UITextField.appearance().clearButtonMode = .whileEditing
+                }
+            TextField("Notes", text: $viewModel.sessionNotes)
+                .padding(.vertical, 4)
+                .onAppear {
+                    UITextField.appearance().clearButtonMode = .whileEditing
+                }
+            TagInputView(tags: $viewModel.sessionTags)
+        }
+    }
+    
+    // MARK: - Session Pages
+    
+    private var sessionPages: some View {
+        TabView(selection: $selectedPageID) {
+            ForEach(allPages, id: \.id) { page in
+                Group {
+                    if let session = page.session {
+                        savedSessionPage(session)
+                    } else {
+                        activeSessionPage
+                    }
+                }
+                .tag(page.id)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .onChange(of: selectedPageID) { oldValue, newValue in
+            handlePageChange(from: oldValue, to: newValue)
+        }
+    }
+    
+    private func savedSessionPage(_ session: Session) -> some View {
         List {
-          detailsSection
+            Section { sessionActionRow(session: session) }
+                .listSectionSpacing(12)
 
-          if editTarget == nil {
-            Section(header: Text("Recents")) {
-              SessionRecentsView(viewModel: viewModel)
+            Section {
+                TextField("Title", text: $editTitle)
+                    .font(.title)
+                    .padding(.vertical, 4)
+                    .focused($textFieldFocused)
+                TextField("Notes", text: $editNotes)
+                    .font(.body)
+                    .padding(.vertical, 4)
+                    .focused($textFieldFocused)
+                TagInputView(tags: $editTags)
+                timeScrubRow
             }
-          }
         }
-        .refreshable {
-          viewModel.fetchSessions()
-        }
-        .scrollDisabled(timelineInteracting)
-        .listStyle(InsetGroupedListStyle())
-        .sheet(isPresented: $showBarSessions) { barSessionsSheet }
-      }
+        .listStyle(.insetGrouped)
+    }
 
-      // Undo toast
-      if showUndoToast {
-        undoToast
-          .transition(.move(edge: .bottom).combined(with: .opacity))
-          .padding(.bottom, 16)
+    private func sessionActionRow(session: Session) -> some View {
+        HStack(spacing: 12) {
+            Spacer()
+            Button { } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 12, weight: .medium))
+                    .frame(width: 10, height: 10)
+                    .padding(10)
+                    .background(Color.primary.opacity(0.1), in: Circle())
+            }
+            .buttonStyle(.plain)
+            Button {
+                viewModel.deleteSession(session)
+                withAnimation { editTarget = nil; scrubField = nil }
+                resetVisibleHours()
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 12, weight: .medium))
+                    .frame(width: 10, height: 10)
+                    .padding(10)
+                    .background(Color.red.opacity(0.12), in: Circle())
+                    .foregroundStyle(.red)
+            }
+            .buttonStyle(.plain)
+        }
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 4, trailing: 16))
+    }
+
+    private var timeScrubRow: some View {
+        HStack {
+            Button { toggleScrub(.start) } label: {
+                VStack(spacing: 2) {
+                    Text(editStartDate.formatted(date: .omitted, time: .shortened))
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(scrubField == .start ? .blue : .primary)
+                    Image(systemName: "arrow.left.to.line")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(scrubField == .start ? Color.blue.opacity(0.08) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+
+            VStack(spacing: 2) {
+                Text(formatDuration(editEndDate.timeIntervalSince(editStartDate)))
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Image(systemName: "capsule.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+
+            Button { toggleScrub(.end) } label: {
+                VStack(spacing: 2) {
+                    Text(editEndDate.formatted(date: .omitted, time: .shortened))
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(scrubField == .end ? .blue : .primary)
+                    Image(systemName: "arrow.right.to.line")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(scrubField == .end ? Color.blue.opacity(0.08) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+  private var activeSessionPage: some View {
+    List {
+      Section {
+        TextField("Title", text: $viewModel.sessionName)
+              .font(.title)
+          .padding(.vertical, 4)
+          .focused($textFieldFocused)
+        TextField("Notes", text: $viewModel.sessionNotes)
+          .padding(.vertical, 4)
+          .focused($textFieldFocused)
+        TagInputView(tags: $viewModel.sessionTags)
+
+        if let startTime = viewModel.startTime {
+          HStack(spacing: 0) {
+            Button {
+              if scrubField == .start {
+                withAnimation { scrubField = nil }
+              } else {
+                withAnimation { scrubField = .start }
+              }
+            } label: {
+              VStack(spacing: 2) {
+                  Text(editStartDate.formatted(date: .omitted, time: .shortened))
+                      .font(.body.weight(.medium))
+                      .foregroundStyle(scrubField == .start ? .blue : .primary)
+                  Image(systemName: "arrow.left.to.line")
+                      .font(.caption)
+                      .foregroundStyle(.secondary)
+              }
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 6)
+              .background(scrubField == .start ? Color.blue.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+            }
+
+            VStack(spacing: 2) {
+              Text(formatDuration(Date().timeIntervalSince(startTime)))
+                .font(.body.weight(.medium))
+                .foregroundStyle(.secondary)
+              Image(systemName: "capsule.lefthalf.filled")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+          }
+          .buttonStyle(.plain)
+        }
       }
     }
-    .animation(.easeInOut(duration: 0.25), value: showUndoToast)
-    .onChange(of: editStartDate) { _, newValue in
-      if scrubField == .start && newValue >= editEndDate {
-        editStartDate = editEndDate.addingTimeInterval(-60)
-      }
-      // Live update: write through to session
-      if scrubField == .start, case .saved(let session) = editTarget {
-        session.startDate = newValue
-      }
+    .listStyle(.insetGrouped)
+  }
+
+  private func handlePageChange(from oldID: String, to newID: String) {
+    // Save edits for the outgoing session
+    if case .saved(let session) = editTarget {
+      saveEditsToSession(session)
     }
-    .onChange(of: editEndDate) { _, newValue in
-      if scrubField == .end && newValue <= editStartDate {
-        editEndDate = editStartDate.addingTimeInterval(60)
+    scrubField = nil
+
+    // Load the incoming session
+    if newID == Self.activePageID {
+      withAnimation { editTarget = .active }
+      if let start = viewModel.startTime {
+        zoomOrDefer(start: start, end: Date())
       }
-      if scrubField == .end && newValue > Date() {
-        editEndDate = Date()
-      }
-      // Live update: write through to session
-      if scrubField == .end, case .saved(let session) = editTarget {
-        session.endDate = newValue
-      }
+    } else if let session = viewModel.todaySessions.first(where: { $0.id.uuidString == newID }) {
+      editTitle = session.title
+      editNotes = session.notes
+      editTags = session.tags
+      editStartDate = session.startDate
+      editEndDate = session.endDate
+      undoSnapshot = (start: session.startDate, end: session.endDate)
+      withAnimation { editTarget = .saved(session) }
+      zoomOrDefer(start: session.startDate, end: session.endDate)
     }
   }
 
-  // MARK: - Details Section
-
-  @ViewBuilder
-  private var detailsSection: some View {
-    switch editTarget {
-    case nil:
-      Section(header: Text("Details")) {
-        TextField("Title", text: $viewModel.sessionName)
-          .padding(.vertical, 4)
-          .onAppear {
-            UITextField.appearance().clearButtonMode = .whileEditing
-          }
-        TextField("Notes", text: $viewModel.sessionNotes)
-          .padding(.vertical, 4)
-          .onAppear {
-            UITextField.appearance().clearButtonMode = .whileEditing
-          }
-        TagInputView(tags: $viewModel.sessionTags)
-      }
-
-    case .active:
-      // Active session selected — show details + scrub-editable start
-      Section(header: HStack {
-        Text("Active Session")
-        Spacer()
-        Button("Done") {
-          withAnimation {
-            editTarget = nil
-            scrubField = nil
-          }
-          resetVisibleHours()
-        }
-        .font(.subheadline)
-      }) {
-        TextField("Title", text: $viewModel.sessionName)
-          .padding(.vertical, 4)
-          .onAppear {
-            UITextField.appearance().clearButtonMode = .whileEditing
-          }
-        TextField("Notes", text: $viewModel.sessionNotes)
-          .padding(.vertical, 4)
-          .onAppear {
-            UITextField.appearance().clearButtonMode = .whileEditing
-          }
-        TagInputView(tags: $viewModel.sessionTags)
-      }
-
-      if let startTime = viewModel.startTime {
-        Section(header: Text("Time")) {
-          Button {
-            if scrubField == .start {
-              withAnimation { scrubField = nil }
-            } else {
-              withAnimation { scrubField = .start }
-            }
-          } label: {
-            HStack {
-              Text("Start")
-                .foregroundStyle(.primary)
-              Spacer()
-              Text(startTime.formatted(date: .omitted, time: .shortened))
-                .foregroundStyle(scrubField == .start ? .blue : .secondary)
-            }
-          }
-          .listRowBackground(scrubField == .start ? Color.blue.opacity(0.08) : nil)
-
-          LabeledContent("Running") {
-            Text(formatDuration(Date().timeIntervalSince(startTime)))
-              .foregroundStyle(.secondary)
-          }
-        }
-      }
-
-    case .saved(let session):
-      // Editing a saved session inline
-      Section(header: HStack {
-        Text("Editing Session")
-        Spacer()
-        Button("Done") {
-          finishEditing(session)
-        }
-        .font(.subheadline)
-      }) {
-        TextField("Title", text: $editTitle)
-          .padding(.vertical, 4)
-        TextField("Notes", text: $editNotes)
-          .padding(.vertical, 4)
-        TagInputView(tags: $editTags)
-      }
-
-      Section(header: Text("Time")) {
-        // Start — tappable to enter scrub mode
-        Button {
-          toggleScrub(.start)
-        } label: {
-          HStack {
-            Text("Start")
-              .foregroundStyle(.primary)
-            Spacer()
-            Text(editStartDate.formatted(date: .omitted, time: .shortened))
-              .foregroundStyle(scrubField == .start ? .blue : .secondary)
-          }
-        }
-        .listRowBackground(scrubField == .start ? Color.blue.opacity(0.08) : nil)
-
-        // End — tappable to enter scrub mode
-        Button {
-          toggleScrub(.end)
-        } label: {
-          HStack {
-            Text("End")
-              .foregroundStyle(.primary)
-            Spacer()
-            Text(editEndDate.formatted(date: .omitted, time: .shortened))
-              .foregroundStyle(scrubField == .end ? .blue : .secondary)
-          }
-        }
-        .listRowBackground(scrubField == .end ? Color.blue.opacity(0.08) : nil)
-
-        LabeledContent("Duration") {
-          Text(formatDuration(editEndDate.timeIntervalSince(editStartDate)))
-            .foregroundStyle(.secondary)
-        }
-      }
-
-      if scrubField != nil {
-        Section {
-          HStack {
-            Text("Scrubbing \(scrubField == .start ? "start" : "end") time — drag the timeline")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-            Spacer()
-            Button("Done") {
-              withAnimation { scrubField = nil }
-              zoomToFit(session: nil, start: editStartDate, end: editEndDate)
-            }
-            .font(.caption.bold())
-          }
-        }
-      }
-
-      Section {
-        Button("Delete Session", role: .destructive) {
-          viewModel.deleteSession(session)
-          withAnimation {
-            editTarget = nil
-            scrubField = nil
-          }
-          resetVisibleHours()
-        }
-        .frame(maxWidth: .infinity)
-      }
+  /// Zoom immediately if the user isn't dragging; otherwise defer until they lift their finger.
+  private func zoomOrDefer(start: Date, end: Date) {
+    if timelineInteracting {
+      pendingZoom = (start: start, end: end)
+    } else {
+      zoomToFit(session: nil, start: start, end: end)
     }
   }
 
@@ -320,6 +455,7 @@ struct TimerFormView: View {
 
   private func handleBarTap(_ bar: TagBar) {
     if bar.isActive {
+      selectedPageID = Self.activePageID
       withAnimation { editTarget = .active }
       if let start = viewModel.startTime {
         zoomToFit(session: nil, start: start, end: Date())
@@ -345,6 +481,7 @@ struct TimerFormView: View {
     editStartDate = session.startDate
     editEndDate = session.endDate
     undoSnapshot = (start: session.startDate, end: session.endDate)
+    selectedPageID = session.id.uuidString
     withAnimation { editTarget = .saved(session) }
     zoomToFit(session: session, start: session.startDate, end: session.endDate)
   }
@@ -490,7 +627,10 @@ struct TimerFormView: View {
         }
       }
     }
-    .presentationDetents([.medium])
+    .presentationDetents([.height(250), .medium])
+    .presentationCornerRadius(20)
+    .presentationDragIndicator(.visible)
+    .presentationBackgroundInteraction(.enabled)
   }
 }
 

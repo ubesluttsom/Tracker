@@ -228,3 +228,19 @@
 - [ ] As a user, I want to more easily add manual session entries. Currently
       it's only possible to add sessions by spamming start and stop, then edit
       later.
+
+---
+
+- [ ] As a user, I want a media-player-style bottom bar for the timer controls.
+
+### Tasks
+
+- [ ] Move the timer display to the very bottom of the screen (above the
+      timeline), reminiscent of a media player's now-playing bar
+- [ ] Move the play/stop button down to the bottom bar; add a long-press
+      pop-up menu on it (e.g. quick actions)
+- [ ] Change the daily total duration view so that filtering is done by
+      long-pressing it and selecting tags from a pop-up menu (instead of the
+      current inline tag chips)
+- [ ] Show a subtle indicator (star or dot) when the daily total is filtered,
+      but don't display the tag names in normal viewing
